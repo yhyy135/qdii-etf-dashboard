@@ -1,0 +1,1122 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>美股QDII ETF 实时看板</title>
+<meta name="description" content="A股场内跟踪美股指数的QDII ETF实时行情看板：价格、涨跌幅、溢价率、规模、年涨跌幅，支持排序与手动刷新。">
+<style>
+/* ============ Design tokens ============ */
+:root{
+  --bg:#ffffff;
+  --bg-subtle:#f6f8fa;
+  --bg-inset:#f0f3f6;
+  --surface:#ffffff;
+  --border:#d8dee4;
+  --border-muted:#e6eaef;
+  --fg:#1f2328;
+  --fg-muted:#59636e;
+  --fg-subtle:#818b98;
+  --accent:#0969da;
+  --accent-fg:#ffffff;
+  --accent-subtle:#ddf4ff;
+  --up:#cf222e;          /* 中国市场习惯：涨=红 */
+  --up-bg:#fff0f0;
+  --down:#1a7f37;        /* 跌=绿 */
+  --down-bg:#eefbf1;
+  --danger:#cf222e;
+  --danger-bg:#fff5f5;
+  --danger-border:#ffbdc0;
+  --warn:#9a6700;
+  --warn-bg:#fff8c5;
+  --warn-border:#f2e07a;
+  --ok:#1a7f37;
+  --shadow-sm:0 1px 2px rgba(31,35,40,.06);
+  --shadow-md:0 3px 6px rgba(31,35,40,.10),0 1px 2px rgba(31,35,40,.06);
+  --shadow-lg:0 12px 32px rgba(31,35,40,.16);
+  --radius:8px;
+  --radius-sm:6px;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",Roboto,Helvetica,Arial,sans-serif;
+}
+:root[data-theme="dark"], :root:not([data-theme="light"]) {}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0d1117;
+    --bg-subtle:#161b22;
+    --bg-inset:#010409;
+    --surface:#161b22;
+    --border:#30363d;
+    --border-muted:#21262d;
+    --fg:#e6edf3;
+    --fg-muted:#9198a1;
+    --fg-subtle:#6e7681;
+    --accent:#4493f8;
+    --accent-fg:#ffffff;
+    --accent-subtle:#121d2f;
+    --up:#ff7b72;
+    --up-bg:#25171c;
+    --down:#3fb950;
+    --down-bg:#12261e;
+    --danger:#f85149;
+    --danger-bg:#25171c;
+    --danger-border:#5c2626;
+    --warn:#d29922;
+    --warn-bg:#272115;
+    --warn-border:#4d3c14;
+    --ok:#3fb950;
+    --shadow-sm:0 1px 2px rgba(1,4,9,.5);
+    --shadow-md:0 3px 6px rgba(1,4,9,.6);
+    --shadow-lg:0 12px 32px rgba(1,4,9,.7);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0d1117; --bg-subtle:#161b22; --bg-inset:#010409; --surface:#161b22;
+  --border:#30363d; --border-muted:#21262d;
+  --fg:#e6edf3; --fg-muted:#9198a1; --fg-subtle:#6e7681;
+  --accent:#4493f8; --accent-fg:#fff; --accent-subtle:#121d2f;
+  --up:#ff7b72; --up-bg:#25171c; --down:#3fb950; --down-bg:#12261e;
+  --danger:#f85149; --danger-bg:#25171c; --danger-border:#5c2626;
+  --warn:#d29922; --warn-bg:#272115; --warn-border:#4d3c14; --ok:#3fb950;
+  --shadow-sm:0 1px 2px rgba(1,4,9,.5);
+  --shadow-md:0 3px 6px rgba(1,4,9,.6);
+  --shadow-lg:0 12px 32px rgba(1,4,9,.7);
+}
+
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--fg); font-family:var(--sans);
+  font-size:14px; line-height:1.5; -webkit-font-smoothing:antialiased;
+  -webkit-text-size-adjust:100%;
+}
+button{font-family:inherit;font-size:inherit;cursor:pointer}
+a{color:var(--accent)}
+
+/* ============ Layout ============ */
+.wrap{max-width:1440px;margin:0 auto;padding:0 16px 64px}
+
+header.top{
+  position:sticky;top:0;z-index:40;background:var(--bg);
+  border-bottom:1px solid var(--border-muted);
+  padding:14px 0 12px;margin-bottom:16px;
+}
+.top-inner{max-width:1440px;margin:0 auto;padding:0 16px;
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.brand{display:flex;align-items:baseline;gap:10px;margin-right:auto;min-width:0}
+.brand h1{font-size:18px;font-weight:600;margin:0;letter-spacing:-.01em;white-space:nowrap}
+.brand .sub{font-size:12px;color:var(--fg-subtle);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+
+.btn{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:6px 12px;border-radius:var(--radius-sm);
+  border:1px solid var(--border);background:var(--bg-subtle);color:var(--fg);
+  font-weight:500;font-size:13px;line-height:20px;
+  transition:background .12s,border-color .12s,transform .06s;
+  white-space:nowrap;
+}
+.btn:hover{background:var(--bg-inset);border-color:var(--fg-subtle)}
+.btn:active{transform:translateY(1px)}
+.btn:disabled{opacity:.55;cursor:not-allowed;transform:none}
+.btn.primary{background:var(--accent);border-color:transparent;color:var(--accent-fg)}
+.btn.primary:hover{filter:brightness(1.08);background:var(--accent)}
+.btn.icon{padding:6px 9px}
+.btn.sm{padding:4px 10px;font-size:12px}
+
+.key-pill{
+  display:inline-flex;align-items:center;gap:6px;font-size:12px;
+  padding:4px 10px;border-radius:999px;border:1px solid var(--border);
+  background:var(--bg-subtle);color:var(--fg-muted);white-space:nowrap;
+}
+.key-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--fg-subtle);flex:none}
+.key-pill.ok .dot{background:var(--ok)}
+.key-pill.none .dot{background:var(--warn)}
+
+/* ============ Status / meta bar ============ */
+.metabar{
+  display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+  font-size:12px;color:var(--fg-muted);margin:0 0 12px;min-height:20px;
+}
+.metabar .sep{width:1px;height:12px;background:var(--border)}
+.metabar b{color:var(--fg);font-weight:600;font-variant-numeric:tabular-nums}
+
+.spinner{
+  width:13px;height:13px;border-radius:50%;flex:none;
+  border:2px solid var(--border);border-top-color:var(--accent);
+  animation:spin .7s linear infinite;display:inline-block;vertical-align:-2px;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.progress-track{height:2px;background:var(--border-muted);border-radius:2px;overflow:hidden;width:100%;margin-bottom:12px}
+.progress-fill{height:100%;background:var(--accent);width:0;transition:width .2s ease}
+
+/* ============ Alerts ============ */
+.alert{
+  border-radius:var(--radius);padding:12px 14px;margin:0 0 14px;
+  display:flex;gap:10px;align-items:flex-start;font-size:13px;
+  border:1px solid var(--danger-border);background:var(--danger-bg);color:var(--fg);
+}
+.alert .ic{flex:none;font-size:15px;line-height:20px}
+.alert .body{flex:1;min-width:0}
+.alert .title{font-weight:600;margin-bottom:2px;color:var(--danger)}
+.alert .detail{color:var(--fg-muted);word-break:break-word}
+.alert ul{margin:6px 0 0;padding-left:18px;color:var(--fg-muted)}
+.alert .alert-actions{display:flex;gap:8px;margin-top:10px}
+.alert.warn{border-color:var(--warn-border);background:var(--warn-bg)}
+.alert.warn .title{color:var(--warn)}
+.alert .close{background:none;border:none;color:var(--fg-subtle);font-size:16px;padding:0 2px;line-height:1}
+
+/* ============ Empty state ============ */
+.empty{
+  border:1px dashed var(--border);border-radius:var(--radius);
+  padding:48px 24px;text-align:center;background:var(--bg-subtle);
+}
+.empty h2{margin:0 0 8px;font-size:16px;font-weight:600}
+.empty p{margin:0 auto 18px;max-width:460px;color:var(--fg-muted);font-size:13px}
+
+/* ============ Table ============ */
+.table-card{
+  border:1px solid var(--border);border-radius:var(--radius);
+  background:var(--surface);overflow:hidden;box-shadow:var(--shadow-sm);
+}
+.table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;position:relative}
+table{border-collapse:separate;border-spacing:0;width:100%;min-width:1120px}
+thead th{
+  position:sticky;top:0;z-index:2;background:var(--bg-subtle);
+  border-bottom:1px solid var(--border);
+  padding:9px 12px;text-align:right;font-size:12px;font-weight:600;
+  color:var(--fg-muted);white-space:nowrap;user-select:none;
+}
+thead th.txt{text-align:left}
+th.sortable{cursor:pointer}
+th.sortable:hover{color:var(--fg);background:var(--bg-inset)}
+th .th-in{display:inline-flex;align-items:center;gap:4px}
+th.txt .th-in{flex-direction:row}
+th:not(.txt) .th-in{flex-direction:row-reverse}
+.arrow{font-size:9px;opacity:.28;transition:opacity .12s}
+th.sorted .arrow{opacity:1;color:var(--accent)}
+th.sorted{color:var(--fg)}
+th .hint{
+  font-weight:400;color:var(--fg-subtle);cursor:help;display:inline-block;
+  width:14px;height:14px;line-height:14px;text-align:center;border-radius:50%;
+  font-size:11px;vertical-align:1px;transition:color .12s,background .12s;
+}
+th .hint:hover,th .hint:focus-visible,th .hint.active{
+  color:var(--accent-fg);background:var(--accent);outline:none;
+}
+
+/* 自绘 tooltip：hover / 点击 / 键盘聚焦均可触发，移动端可点按 */
+.tip{
+  position:fixed;z-index:90;max-width:min(280px,calc(100vw - 24px));
+  padding:7px 10px;border-radius:6px;
+  background:var(--fg);color:var(--bg);
+  font-size:12px;font-weight:400;line-height:1.55;text-align:left;white-space:normal;
+  box-shadow:var(--shadow-md);pointer-events:none;
+  opacity:0;transform:translateY(3px);transition:opacity .12s ease,transform .12s ease;
+  font-variant-numeric:normal;
+}
+.tip.show{opacity:1;transform:none}
+.tip::after{
+  content:"";position:absolute;left:var(--tip-ax,50%);margin-left:-4px;
+  border:4px solid transparent;
+}
+.tip:not(.below)::after{top:100%;border-top-color:var(--fg)}
+.tip.below::after{bottom:100%;border-bottom-color:var(--fg)}
+
+tbody td{
+  padding:9px 12px;border-bottom:1px solid var(--border-muted);
+  text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;
+}
+tbody td.txt{text-align:left;white-space:nowrap}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover td{background:var(--bg-subtle)}
+tbody tr.err td{background:var(--danger-bg)}
+tbody tr.err:hover td{background:var(--danger-bg)}
+
+td.code{font-family:var(--mono);font-size:13px;font-weight:600}
+td.code .mkt{color:var(--fg-subtle);font-weight:400;font-size:11px;margin-left:3px}
+td.name{font-weight:500;min-width:150px}
+td.name .sm{display:block;font-size:11px;color:var(--fg-subtle);font-weight:400}
+td.dim{color:var(--fg-muted);font-size:13px}
+td.num{font-family:var(--mono);font-size:13px}
+td.price{font-weight:600}
+.up{color:var(--up)}
+.down{color:var(--down)}
+.flat{color:var(--fg-muted)}
+.chip{
+  display:inline-block;padding:2px 7px;border-radius:5px;font-family:var(--mono);
+  font-size:12px;font-weight:600;min-width:64px;text-align:right;
+}
+.chip.up{background:var(--up-bg)}
+.chip.down{background:var(--down-bg)}
+.chip.flat{background:var(--bg-inset)}
+.tag{
+  display:inline-block;padding:1px 7px;border-radius:999px;font-size:11px;
+  border:1px solid var(--border);color:var(--fg-muted);background:var(--bg-subtle);
+  white-space:nowrap;
+}
+.na{color:var(--fg-subtle)}
+
+/* loading skeleton + dim */
+.table-card.loading{position:relative}
+.table-card.loading tbody tr.pending td{opacity:.5}
+.skel{display:inline-block;height:11px;width:52px;border-radius:3px;
+  background:linear-gradient(90deg,var(--bg-inset) 25%,var(--border-muted) 37%,var(--bg-inset) 63%);
+  background-size:400% 100%;animation:shimmer 1.3s ease infinite;vertical-align:middle}
+.skel.w-lg{width:96px}
+.skel.w-sm{width:38px}
+@keyframes shimmer{0%{background-position:100% 50%}100%{background-position:0 50%}}
+
+.footnote{margin-top:14px;font-size:12px;color:var(--fg-subtle);line-height:1.7}
+.footnote code{font-family:var(--mono);background:var(--bg-subtle);padding:1px 5px;border-radius:4px;border:1px solid var(--border-muted)}
+
+/* ============ Modal ============ */
+.modal-backdrop{
+  position:fixed;inset:0;background:rgba(31,35,40,.45);z-index:100;
+  display:flex;align-items:flex-start;justify-content:center;padding:24px 16px;
+  overflow-y:auto;backdrop-filter:blur(2px);
+}
+.modal-backdrop[hidden]{display:none}
+.modal{
+  background:var(--surface);border:1px solid var(--border);border-radius:12px;
+  box-shadow:var(--shadow-lg);width:100%;max-width:520px;margin:auto;
+  animation:pop .14s ease-out;
+}
+@keyframes pop{from{opacity:0;transform:translateY(-6px) scale(.99)}to{opacity:1;transform:none}}
+.modal h2{margin:0;font-size:16px;font-weight:600}
+.modal-head{display:flex;align-items:center;justify-content:space-between;
+  padding:16px 18px;border-bottom:1px solid var(--border-muted)}
+.modal-body{padding:18px}
+.modal-foot{padding:14px 18px;border-top:1px solid var(--border-muted);
+  display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;background:var(--bg-subtle);
+  border-radius:0 0 12px 12px}
+label.fl{display:block;font-size:13px;font-weight:600;margin-bottom:6px}
+.input-row{display:flex;gap:6px}
+input[type=text],input[type=password]{
+  flex:1;min-width:0;padding:8px 11px;font-family:var(--mono);font-size:13px;
+  border:1px solid var(--border);border-radius:var(--radius-sm);
+  background:var(--bg);color:var(--fg);
+}
+input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-subtle)}
+.help{font-size:12px;color:var(--fg-muted);margin-top:8px;line-height:1.6}
+.note{
+  margin-top:14px;padding:10px 12px;border-radius:var(--radius-sm);
+  background:var(--warn-bg);border:1px solid var(--warn-border);
+  font-size:12px;color:var(--fg);line-height:1.6;
+}
+.status-line{margin-top:12px;font-size:13px;min-height:20px;line-height:1.6}
+.status-line .spinner{margin-right:6px}
+.status-line.ok{color:var(--ok)}
+.status-line.bad{color:var(--danger)}
+.status-line.busy{color:var(--fg-muted)}
+
+@media (max-width:820px){
+  .wrap{padding:0 12px 48px}
+  .top-inner{padding:0 12px}
+  .brand h1{font-size:16px}
+  .brand .sub{display:none}
+  thead th:first-child,tbody td:first-child{
+    position:sticky;left:0;z-index:1;background:var(--surface);
+    box-shadow:1px 0 0 var(--border-muted);
+  }
+  thead th:first-child{z-index:3;background:var(--bg-subtle)}
+  tbody tr:hover td:first-child{background:var(--bg-subtle)}
+}
+@media (max-width:640px){
+  .top-inner{flex-wrap:nowrap}
+  .actions{flex-wrap:nowrap;flex:none}
+  .brand{flex:1 1 auto;overflow:hidden}
+  .brand h1{font-size:15px;overflow:hidden;text-overflow:ellipsis}
+  .btn{padding:6px 9px}
+  .btn .lbl{display:none}
+  .key-pill{display:none}
+  .metabar{gap:10px;row-gap:4px}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.01ms !important;transition-duration:.01ms !important}
+}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-inner">
+    <div class="brand">
+      <h1>美股 QDII ETF 看板</h1>
+      <span class="sub">A股场内 · 跟踪美股指数 · 同花顺金融数据</span>
+    </div>
+    <div class="actions">
+      <span id="keyPill" class="key-pill none"><span class="dot"></span><span id="keyPillText">未设置密钥</span></span>
+      <button class="btn icon" id="themeBtn" title="切换主题" aria-label="切换主题">🌓</button>
+      <button class="btn" id="settingsBtn">⚙️ <span class="lbl">API设置</span></button>
+      <button class="btn primary" id="refreshBtn">↻ <span class="lbl">刷新</span></button>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <div id="alerts"></div>
+
+  <div class="metabar" id="metabar"></div>
+  <div class="progress-track" id="progressTrack" hidden><div class="progress-fill" id="progressFill"></div></div>
+
+  <div id="content"></div>
+
+  <p class="footnote">
+    <b>字段口径：</b>
+    <b>溢价率</b> = 场内最新价 ÷ 最新公布单位净值 − 1。QDII 基金净值按 T‑1/T‑2 披露，且不含当日美股涨跌，因此该值为<b>估算溢价</b>，与交易所盘中 IOPV 存在偏差，仅供横向比较参考。
+    <b>规模</b>取基金最新披露的资产净值（元→亿元）。
+    <b>年涨跌幅</b>为<b>今年以来</b>净值收益率（悬停可见近1年）。
+    数据源 <code>fuyao.aicubes.cn</code>（同花顺金融数据 API），行情为交易时段快照，非逐笔实时推送。<br>
+    本页面仅做数据展示，不构成任何投资建议。
+  </p>
+</div>
+
+<!-- ============ Settings modal ============ -->
+<div class="modal-backdrop" id="modal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-head">
+      <h2 id="modalTitle">🔑 API 密钥设置</h2>
+      <button class="btn icon sm" id="modalClose" aria-label="关闭">✕</button>
+    </div>
+    <div class="modal-body">
+      <label class="fl" for="keyInput">同花顺金融数据 API Key</label>
+      <div class="input-row">
+        <input type="password" id="keyInput" placeholder="sk-fuyao-..." autocomplete="off" spellcheck="false">
+        <button class="btn" id="toggleReveal" title="显示/隐藏">👁</button>
+      </div>
+      <p class="help">
+        密钥通过请求头 <code style="font-family:var(--mono)">X-api-key</code> 发送至
+        <a href="https://fuyao.aicubes.cn/docs/" target="_blank" rel="noopener">fuyao.aicubes.cn</a>。
+        点击「验证并保存」会调用一次行情接口校验密钥有效性。
+      </p>
+      <div class="status-line" id="keyStatus"></div>
+      <div class="note">
+        ⚠️ 密钥以<b>明文</b>保存在本浏览器的 localStorage 中，不会上传到本站以外的任何服务器。
+        在公共 / 共享电脑上使用后，请点击「清除密钥」。
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" id="clearKeyBtn">清除密钥</button>
+      <button class="btn" id="cancelBtn">取消</button>
+      <button class="btn primary" id="saveKeyBtn">验证并保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* =========================================================================
+   1. 内置标的清单（来自 ETF_LIST.md：A股场内美股宽基/窄基 QDII ETF，共 24 只）
+   ========================================================================= */
+const ETFS = [
+  // ---- 纳斯达克100（宽基，11只）----
+  {code:"159941", ths:"159941.SZ", name:"纳指ETF",        company:"广发基金",   index:"纳斯达克100",  cat:"纳斯达克100"},
+  {code:"513100", ths:"513100.SH", name:"纳指ETF",        company:"国泰基金",   index:"纳斯达克100",  cat:"纳斯达克100"},
+  {code:"513300", ths:"513300.SH", name:"纳指ETF",        company:"华夏基金",   index:"纳斯达克100",  cat:"纳斯达克100"},
+  {code:"159501", ths:"159501.SZ", name:"纳指ETF",        company:"嘉实基金",   index:"纳斯达克100",  cat:"纳斯达克100"},
+  {code:"159632", ths:"159632.SZ", name:"纳指ETF",        company:"华安基金",   index:"纳斯达克100",  cat:"纳斯达克100"},
+  {code:"159659", ths:"159659.SZ", name:"纳指100ETF",     company:"招商基金",   index:"纳斯达克100",  cat:"纳斯达克100"},
+  {code:"159513", ths:"159513.SZ", name:"纳指100ETF",     company:"大成基金",   index:"纳斯达克100",  cat:"纳斯达克100"},
+  {code:"513110", ths:"513110.SH", name:"纳指100ETF",     company:"华泰柏瑞",   index:"纳斯达克100",  cat:"纳斯达克100"},
+  {code:"159696", ths:"159696.SZ", name:"纳指ETF",        company:"易方达基金", index:"纳斯达克100",  cat:"纳斯达克100"},
+  {code:"513390", ths:"513390.SH", name:"纳指100ETF",     company:"博时基金",   index:"纳斯达克100",  cat:"纳斯达克100"},
+  {code:"513870", ths:"513870.SH", name:"纳指ETF",        company:"富国基金",   index:"纳斯达克100",  cat:"纳斯达克100"},
+  // ---- 标普500（宽基，5只）----
+  {code:"513500", ths:"513500.SH", name:"标普500ETF",     company:"博时基金",   index:"标普500",     cat:"标普500"},
+  {code:"513650", ths:"513650.SH", name:"标普500ETF",     company:"南方基金",   index:"标普500",     cat:"标普500"},
+  {code:"159655", ths:"159655.SZ", name:"标普500ETF",     company:"华夏基金",   index:"标普500",     cat:"标普500"},
+  {code:"161125", ths:"161125.SZ", name:"标普500(QDII-LOF)", company:"易方达基金", index:"标普500", cat:"标普500", lof:true},
+  {code:"159612", ths:"159612.SZ", name:"标普500ETF",     company:"国泰基金",   index:"标普500",     cat:"标普500"},
+  // ---- 道琼斯工业（宽基，1只）----
+  {code:"513400", ths:"513400.SH", name:"道琼斯ETF",      company:"鹏华基金",   index:"道琼斯工业平均", cat:"道琼斯"},
+  // ---- 窄基 / 行业主题（7只）----
+  {code:"159509", ths:"159509.SZ", name:"纳斯达克科技ETF", company:"景顺长城",   index:"纳斯达克科技市值加权", cat:"窄基"},
+  {code:"161128", ths:"161128.SZ", name:"标普信息科技(QDII-LOF)", company:"易方达基金", index:"标普500信息科技", cat:"窄基", lof:true},
+  {code:"159502", ths:"159502.SZ", name:"标普生物科技ETF", company:"嘉实基金",   index:"标普生物科技精选行业", cat:"窄基"},
+  {code:"513290", ths:"513290.SH", name:"纳指生物科技ETF", company:"汇添富基金", index:"纳斯达克生物科技", cat:"窄基"},
+  {code:"159529", ths:"159529.SZ", name:"标普消费精选ETF", company:"景顺长城",   index:"标普500消费精选", cat:"窄基"},
+  {code:"513350", ths:"513350.SH", name:"标普油气ETF",     company:"富国基金",   index:"标普石油天然气勘探及生产精选", cat:"窄基"},
+  {code:"161127", ths:"161127.SZ", name:"标普生物科技(QDII-LOF)", company:"易方达基金", index:"标普生物科技精选行业", cat:"窄基", lof:true}
+];
+
+/* =========================================================================
+   2. 常量与状态
+   ========================================================================= */
+const API_BASE   = "https://fuyao.aicubes.cn";
+const LS_KEY     = "etf_dash.api_key";
+const LS_THEME   = "etf_dash.theme";
+const LS_SORT    = "etf_dash.sort";
+const MAX_CONC   = 6;      // 全局并发上限（API 超 QPS 返回 code=4001）
+const MAX_RETRY  = 3;
+
+const ERR_MSG = {
+  1001:"缺少必填参数", 1002:"参数格式错误", 1003:"参数取值越界", 1004:"参数冲突",
+  2001:"未认证：API 密钥缺失或无效", 2003:"密钥无效、已吊销或无权调用该接口",
+  3001:"标的不存在", 3002:"数据未就绪", 3004:"该标的类型不支持此接口",
+  4001:"请求频率超限（QPS）", 5001:"服务内部错误", 5002:"上游服务超时", 5003:"数据源不可用"
+};
+
+const state = {
+  apiKey: localStorage.getItem(LS_KEY) || "",
+  rows: new Map(),          // code -> row data
+  loading: false,
+  done: 0,
+  total: ETFS.length,
+  dataTs: null,
+  sort: { key: null, dir: 1 },
+  lastRefresh: null
+};
+
+// 初始化行占位
+ETFS.forEach(e => state.rows.set(e.code, { meta:e, status:"idle", err:null, d:{} }));
+
+// 恢复排序偏好
+try{
+  const s = JSON.parse(localStorage.getItem(LS_SORT) || "null");
+  if (s && s.key) state.sort = s;
+}catch(_){}
+
+/* =========================================================================
+   3. 主题
+   ========================================================================= */
+const themeBtn = document.getElementById("themeBtn");
+function applyTheme(t){
+  if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+  else document.documentElement.removeAttribute("data-theme");
+}
+applyTheme(localStorage.getItem(LS_THEME) || "auto");
+themeBtn.addEventListener("click", () => {
+  const cur = localStorage.getItem(LS_THEME) || "auto";
+  const next = cur === "auto" ? "light" : cur === "light" ? "dark" : "auto";
+  localStorage.setItem(LS_THEME, next);
+  applyTheme(next);
+  themeBtn.title = "主题：" + ({auto:"跟随系统",light:"浅色",dark:"深色"})[next];
+});
+
+/* =========================================================================
+   4. API 层：并发限流 + 重试 + 统一错误
+   ========================================================================= */
+function makeLimiter(n){
+  let active = 0; const queue = [];
+  const next = () => {
+    if (active >= n || !queue.length) return;
+    active++;
+    const { fn, res, rej } = queue.shift();
+    fn().then(res, rej).finally(() => { active--; next(); });
+  };
+  return fn => new Promise((res, rej) => { queue.push({fn,res,rej}); next(); });
+}
+const limit = makeLimiter(MAX_CONC);
+
+class ApiError extends Error{
+  constructor(kind, message, extra){
+    super(message);
+    this.kind = kind;                 // 'auth' | 'network' | 'http' | 'business'
+    Object.assign(this, extra || {});
+  }
+}
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+async function rawGet(path, params, key){
+  const url = new URL(API_BASE + path);
+  Object.entries(params || {}).forEach(([k,v]) => url.searchParams.set(k, v));
+  let resp;
+  try{
+    resp = await fetch(url.toString(), { headers: { "X-api-key": key }, cache: "no-store" });
+  }catch(e){
+    throw new ApiError("network", "网络连接失败，无法访问 " + API_BASE + "（请检查网络 / 代理 / 浏览器拦截）");
+  }
+  if (!resp.ok){
+    throw new ApiError("http", `HTTP ${resp.status} ${resp.statusText || ""}`.trim(), { status: resp.status });
+  }
+  let json;
+  try{ json = await resp.json(); }
+  catch(e){ throw new ApiError("http", "响应不是合法 JSON", { status: resp.status }); }
+
+  if (json.code !== 0){
+    const kind = (json.code === 2001 || json.code === 2003) ? "auth" : "business";
+    const desc = ERR_MSG[json.code] || "未知业务错误";
+    throw new ApiError(kind, `${desc}（code=${json.code}：${json.message || ""}）`,
+      { code: json.code, requestId: json.request_id });
+  }
+  return json.data;
+}
+
+async function apiGet(path, params, key){
+  return limit(async () => {
+    let lastErr;
+    for (let i = 0; i <= MAX_RETRY; i++){
+      try{ return await rawGet(path, params, key); }
+      catch(e){
+        lastErr = e;
+        const retriable = e.code === 4001 || e.code === 5002 || e.code === 5003 || e.kind === "network";
+        if (!retriable || i === MAX_RETRY) throw e;
+        await sleep([400, 1000, 2200][i] + Math.random() * 300);
+      }
+    }
+    throw lastErr;
+  });
+}
+
+const first = d => (d && Array.isArray(d.item) && d.item.length) ? d.item[0] : null;
+
+/* =========================================================================
+   5. 数据获取
+   ========================================================================= */
+async function fetchOne(meta, key){
+  const [snapR, profR, retR] = await Promise.allSettled([
+    apiGet("/api/fund/market/snapshot", { thscode: meta.ths }, key),
+    apiGet("/api/fund/profile/detail",  { fund_type: "exchange", thscode: meta.ths }, key),
+    apiGet("/api/fund/performance/returns", { fund_type: "exchange", thscode: meta.ths }, key)
+  ]);
+
+  const d = {};
+  const errs = [];
+
+  if (snapR.status === "fulfilled"){
+    const s = first(snapR.value) || {};
+    d.price   = num(s.last_price);
+    d.change  = num(s.price_change_ratio_pct);
+    d.high    = num(s.high_price);
+    d.low     = num(s.low_price);
+    d.prev    = num(s.prev_price);
+    d.turnover= num(s.turnover);
+    d.snapTs  = snapR.value && snapR.value.timestamp || null;
+  } else errs.push(snapR.reason);
+
+  if (profR.status === "fulfilled"){
+    const p = first(profR.value) || {};
+    d.nav      = num(p.unit_nav);
+    d.scale    = p.fund_scale == null ? null : num(p.fund_scale) / 1e8;  // 元 -> 亿元
+    d.apiName  = p.fund_name || null;
+    d.mgmt     = p.mgmt_name || null;
+    d.manager  = p.manager_name || null;
+  } else errs.push(profR.reason);
+
+  if (retR.status === "fulfilled"){
+    const r = first(retR.value) || {};
+    d.ytd   = num(r.return_nowyear);
+    d.y1    = num(r.return_year);
+  } else errs.push(retR.reason);
+
+  // 估算溢价率
+  d.premium = (d.price != null && d.nav != null && d.nav > 0)
+    ? (d.price / d.nav - 1) * 100 : null;
+
+  const row = state.rows.get(meta.code);
+  row.d = d;
+  row.err = errs.length ? errs[0] : null;
+  row.status = snapR.status === "fulfilled" ? (errs.length ? "partial" : "ok") : "error";
+  return row;
+}
+
+function num(v){
+  if (v === null || v === undefined || v === "") return null;
+  const n = typeof v === "number" ? v : parseFloat(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+let renderTimer = null;
+function renderSoon(){
+  if (renderTimer) return;
+  renderTimer = setTimeout(() => { renderTimer = null; render(); }, 120);
+}
+
+async function refreshAll(){
+  if (state.loading) return;
+  if (!state.apiKey){ openModal(); return; }
+
+  state.loading = true;
+  state.done = 0;
+  clearAlerts();
+  ETFS.forEach(e => { const r = state.rows.get(e.code); r.status = "pending"; });
+  render();
+
+  const fatal = [];
+  await Promise.all(ETFS.map(async meta => {
+    try{ await fetchOne(meta, state.apiKey); }
+    catch(e){
+      const r = state.rows.get(meta.code);
+      r.status = "error"; r.err = e;
+      if (e.kind === "auth" || e.kind === "network") fatal.push(e);
+    }finally{
+      state.done++;
+      renderSoon();
+    }
+  }));
+
+  // 数据时间：取所有快照中最新的一条
+  let ts = null;
+  state.rows.forEach(r => { if (r.d && r.d.snapTs && (!ts || r.d.snapTs > ts)) ts = r.d.snapTs; });
+  state.dataTs = ts;
+  state.lastRefresh = Date.now();
+  state.loading = false;
+  render();
+
+  reportProblems(fatal);
+}
+
+function reportProblems(fatal){
+  const failed = [], partial = [];
+  state.rows.forEach(r => {
+    if (r.status === "error") failed.push(r);
+    else if (r.status === "partial") partial.push(r);
+  });
+
+  if (failed.length === state.total && failed.length){
+    const e = failed[0].err || {};
+    if (e.kind === "auth"){
+      showAlert({
+        title:"API 密钥无效或无权限",
+        detail:e.message,
+        actions:[{label:"打开 API 设置", primary:true, onClick:openModal}]
+      });
+    } else if (e.kind === "network"){
+      showAlert({
+        title:"网络连接失败",
+        detail:e.message + "（若通过 file:// 直接打开本页出现此问题，多为浏览器扩展或代理拦截所致）",
+        actions:[{label:"重试", primary:true, onClick:refreshAll}]
+      });
+    } else {
+      showAlert({
+        title:"全部标的获取失败",
+        detail:e.message || "未知错误",
+        actions:[{label:"重试", primary:true, onClick:refreshAll}]
+      });
+    }
+    return;
+  }
+
+  if (failed.length){
+    showAlert({
+      title:`${failed.length} 只标的行情获取失败`,
+      detail:"其余标的已正常显示。失败明细：",
+      list:failed.slice(0,6).map(r => `${r.meta.code} ${r.meta.name}：${(r.err && r.err.message) || "未知错误"}`)
+        .concat(failed.length > 6 ? [`…另有 ${failed.length-6} 只`] : []),
+      actions:[{label:"重试", primary:true, onClick:refreshAll}]
+    });
+  } else if (partial.length){
+    showAlert({
+      warn:true,
+      title:`${partial.length} 只标的部分字段缺失`,
+      detail:"行情价格正常，但净值/规模或收益率接口未返回数据，相关单元格显示为「—」。",
+      list:partial.slice(0,5).map(r => `${r.meta.code} ${r.meta.name}：${(r.err && r.err.message) || ""}`)
+    });
+  }
+}
+
+/* =========================================================================
+   6. 格式化
+   ========================================================================= */
+const fmt = {
+  price: v => v == null ? null : v.toFixed(3),
+  nav:   v => v == null ? null : v.toFixed(4),
+  pct:   v => v == null ? null : (v > 0 ? "+" : "") + v.toFixed(2) + "%",
+  scale: v => v == null ? null : v.toFixed(2),
+  time:  ms => {
+    if (!ms) return "—";
+    const d = new Date(ms), p = n => String(n).padStart(2,"0");
+    return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+  },
+  clock: ms => {
+    if (!ms) return "—";
+    const d = new Date(ms), p = n => String(n).padStart(2,"0");
+    return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+  }
+};
+const dirCls = v => v == null ? "flat" : v > 0 ? "up" : v < 0 ? "down" : "flat";
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+/* =========================================================================
+   7. 表格定义与渲染
+   ========================================================================= */
+const COLUMNS = [
+  { id:"code",   label:"代码",     txt:true,  sortable:false },
+  { id:"name",   label:"名称",     txt:true,  sortable:false },
+  { id:"mgmt",   label:"基金公司", txt:true,  sortable:false },
+  { id:"index",  label:"跟踪指数", txt:true,  sortable:false },
+  { id:"price",  label:"价格",     sortable:true },
+  { id:"change", label:"涨跌幅",   sortable:true },
+  { id:"premium",label:"溢价率",   sortable:true, hint:"场内价 ÷ 最新公布净值 − 1，为估算值，非盘中 IOPV" },
+  { id:"nav",    label:"净值/IOPV", sortable:false, hint:"最新公布单位净值（QDII 通常滞后 1–2 个交易日）" },
+  { id:"scale",  label:"规模(亿)", sortable:true },
+  { id:"high",   label:"最高价",   sortable:true },
+  { id:"low",    label:"最低价",   sortable:true },
+  { id:"ytd",    label:"年涨跌幅", sortable:true, hint:"今年以来的净值收益率。指向表格中的具体数值，可查看该只标的近 1 年收益率" }
+];
+
+function sortValue(row, key){
+  const d = row.d || {};
+  return d[key] == null ? null : d[key];
+}
+
+function sortedRows(){
+  const arr = ETFS.map(e => state.rows.get(e.code));
+  const { key, dir } = state.sort;
+  if (!key) return arr;                       // 默认：按代码升序（清单顺序已按代码分组）
+  return arr.slice().sort((a,b) => {
+    const va = sortValue(a,key), vb = sortValue(b,key);
+    if (va == null && vb == null) return a.meta.code.localeCompare(b.meta.code);
+    if (va == null) return 1;                  // 空值恒排末尾
+    if (vb == null) return -1;
+    if (va === vb) return a.meta.code.localeCompare(b.meta.code);
+    return (va - vb) * dir;
+  });
+}
+
+function onHeaderClick(col){
+  if (!col.sortable) return;
+  const s = state.sort;
+  if (s.key !== col.id) { s.key = col.id; s.dir = -1; }        // 首次点击：降序（大→小，更符合看行情的直觉）
+  else if (s.dir === -1) { s.dir = 1; }                         // 再点：升序
+  else { s.key = null; s.dir = 1; }                             // 三点：恢复默认（代码升序）
+  localStorage.setItem(LS_SORT, JSON.stringify(s));
+  render();
+}
+
+function cellHTML(row, col){
+  const d = row.d || {};
+  const m = row.meta;
+  const pending = row.status === "pending";
+  const sk = w => `<span class="skel ${w||""}"></span>`;
+
+  switch(col.id){
+    case "code":
+      return `<td class="txt code">${esc(m.code)}<span class="mkt">${m.ths.endsWith(".SH") ? "SH" : "SZ"}</span></td>`;
+    case "name":
+      return `<td class="txt name">${esc(d.apiName || m.name)}${m.lof ? ' <span class="tag">LOF</span>' : ""}` +
+             `<span class="sm">${esc(m.name)}</span></td>`;
+    case "mgmt": {
+      const v = d.mgmt ? d.mgmt.replace(/(基金)?管理(有限公司|股份有限公司|有限责任公司)$/,"基金").replace(/基金基金$/,"基金") : m.company;
+      return `<td class="txt dim">${esc(v)}</td>`;
+    }
+    case "index":
+      return `<td class="txt dim"><span class="tag">${esc(m.index)}</span></td>`;
+    case "price":
+      if (pending) return `<td class="num">${sk()}</td>`;
+      return `<td class="num price ${dirCls(d.change)}">${d.price == null ? '<span class="na">—</span>' : fmt.price(d.price)}</td>`;
+    case "change":
+      if (pending) return `<td class="num">${sk()}</td>`;
+      return `<td class="num">${d.change == null ? '<span class="na">—</span>'
+        : `<span class="chip ${dirCls(d.change)}">${fmt.pct(d.change)}</span>`}</td>`;
+    case "premium":
+      if (pending) return `<td class="num">${sk("w-sm")}</td>`;
+      return `<td class="num" ${d.premium!=null?`data-tip="场内价 ${fmt.price(d.price)} ÷ 净值 ${fmt.nav(d.nav)} − 1 = ${fmt.pct(d.premium)}（估算，非盘中 IOPV）"`:""}>${
+        d.premium == null ? '<span class="na">—</span>'
+        : `<span class="${dirCls(d.premium)}">${fmt.pct(d.premium)}</span>`}</td>`;
+    case "nav":
+      if (pending) return `<td class="num">${sk("w-sm")}</td>`;
+      return `<td class="num dim">${d.nav == null ? '<span class="na">—</span>' : fmt.nav(d.nav)}</td>`;
+    case "scale":
+      if (pending) return `<td class="num">${sk("w-sm")}</td>`;
+      return `<td class="num">${d.scale == null ? '<span class="na">—</span>' : fmt.scale(d.scale)}</td>`;
+    case "high":
+      if (pending) return `<td class="num">${sk("w-sm")}</td>`;
+      return `<td class="num dim">${d.high == null ? '<span class="na">—</span>' : fmt.price(d.high)}</td>`;
+    case "low":
+      if (pending) return `<td class="num">${sk("w-sm")}</td>`;
+      return `<td class="num dim">${d.low == null ? '<span class="na">—</span>' : fmt.price(d.low)}</td>`;
+    case "ytd": {
+      if (pending) return `<td class="num">${sk()}</td>`;
+      const t = `今年以来 ${fmt.pct(d.ytd) || "—"} ｜ 近1年 ${fmt.pct(d.y1) || "—"}`;
+      return `<td class="num" data-tip="${esc(t)}">${d.ytd == null ? '<span class="na">—</span>'
+        : `<span class="${dirCls(d.ytd)}">${fmt.pct(d.ytd)}</span>`}</td>`;
+    }
+  }
+  return "<td></td>";
+}
+
+function renderTable(){
+  const rows = sortedRows();
+  const head = COLUMNS.map(c => {
+    const sorted = state.sort.key === c.id;
+    const arrow = c.sortable ? `<span class="arrow">${sorted ? (state.sort.dir === 1 ? "▲" : "▼") : "▼"}</span>` : "";
+    const hint = c.hint ? ` <span class="hint" data-tip="${esc(c.hint)}" tabindex="0" role="button" aria-label="字段说明：${esc(c.hint)}">ⓘ</span>` : "";
+    const cls = [c.txt ? "txt" : "", c.sortable ? "sortable" : "", sorted ? "sorted" : ""].filter(Boolean).join(" ");
+    const aria = c.sortable ? ` aria-sort="${sorted ? (state.sort.dir===1?"ascending":"descending") : "none"}" tabindex="0" role="button"` : "";
+    return `<th class="${cls}" data-col="${c.id}"${aria}><span class="th-in">${arrow}<span>${esc(c.label)}${hint}</span></span></th>`;
+  }).join("");
+
+  const body = rows.map(r => {
+    const cls = [r.status === "pending" ? "pending" : "", r.status === "error" ? "err" : ""].filter(Boolean).join(" ");
+    const title = r.status === "error" && r.err ? ` data-tip="${esc(r.err.message)}"` : "";
+    return `<tr class="${cls}"${title}>${COLUMNS.map(c => cellHTML(r,c)).join("")}</tr>`;
+  }).join("");
+
+  return `<div class="table-card ${state.loading ? "loading" : ""}">
+      <div class="table-scroll">
+        <table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>
+      </div>
+    </div>`;
+}
+
+function renderMeta(){
+  const bar = document.getElementById("metabar");
+  if (!state.apiKey){ bar.innerHTML = ""; return; }
+  const ok = [...state.rows.values()].filter(r => r.status === "ok" || r.status === "partial").length;
+  const bad = [...state.rows.values()].filter(r => r.status === "error").length;
+  const parts = [];
+
+  if (state.loading){
+    parts.push(`<span><span class="spinner"></span> 正在加载 <b>${state.done}</b>/<b>${state.total}</b></span>`);
+  } else {
+    parts.push(`<span>标的 <b>${state.total}</b> 只</span>`);
+    parts.push(`<span class="sep"></span>`);
+    parts.push(`<span>行情时间 <b>${fmt.time(state.dataTs)}</b></span>`);
+    parts.push(`<span class="sep"></span>`);
+    parts.push(`<span>本次刷新 <b>${fmt.clock(state.lastRefresh)}</b></span>`);
+    if (bad){ parts.push(`<span class="sep"></span><span style="color:var(--danger)">失败 <b style="color:var(--danger)">${bad}</b> 只</span>`); }
+    else if (ok){ parts.push(`<span class="sep"></span><span style="color:var(--ok)">全部成功</span>`); }
+    if (state.sort.key){
+      const c = COLUMNS.find(c => c.id === state.sort.key);
+      parts.push(`<span class="sep"></span><span>按 <b>${esc(c.label)}</b> ${state.sort.dir===1?"升序":"降序"}（再点两次列头恢复默认）</span>`);
+    }
+  }
+  bar.innerHTML = parts.join("");
+
+  const track = document.getElementById("progressTrack");
+  const fill  = document.getElementById("progressFill");
+  track.hidden = !state.loading;
+  fill.style.width = state.loading ? (state.done / state.total * 100).toFixed(1) + "%" : "0%";
+}
+
+function renderKeyPill(){
+  const pill = document.getElementById("keyPill");
+  const txt  = document.getElementById("keyPillText");
+  if (state.apiKey){
+    pill.className = "key-pill ok";
+    txt.textContent = "密钥已保存 " + maskKey(state.apiKey);
+  } else {
+    pill.className = "key-pill none";
+    txt.textContent = "未设置密钥";
+  }
+}
+
+function maskKey(k){
+  if (k.length <= 12) return k.slice(0,3) + "…";
+  return k.slice(0,10) + "…" + k.slice(-4);
+}
+
+function render(){
+  const c = document.getElementById("content");
+  document.getElementById("refreshBtn").disabled = state.loading;
+  renderKeyPill();
+  renderMeta();
+
+  if (!state.apiKey){
+    c.innerHTML = `<div class="empty">
+      <h2>请先设置 API 密钥</h2>
+      <p>本看板直接在浏览器中调用同花顺金融数据 API（<code style="font-family:var(--mono)">fuyao.aicubes.cn</code>）读取
+      ${state.total} 只美股 QDII ETF 的实时行情。设置密钥后即可加载数据，密钥仅保存在你本机的 localStorage。</p>
+      <button class="btn primary" onclick="openModal()">🔑 设置 API 密钥</button>
+    </div>`;
+    return;
+  }
+
+  c.innerHTML = renderTable();
+  c.querySelectorAll("th.sortable").forEach(th => {
+    const col = COLUMNS.find(x => x.id === th.dataset.col);
+    th.addEventListener("click", () => onHeaderClick(col));
+    th.addEventListener("keydown", ev => {
+      if (ev.key === "Enter" || ev.key === " "){ ev.preventDefault(); onHeaderClick(col); }
+    });
+  });
+}
+
+/* =========================================================================
+   7b. Tooltip：hover / 点击 / 键盘聚焦三种方式触发
+   —— 原生 title 悬停延迟长、移动端不可用，且点击会冒泡触发列排序，故自绘。
+   ========================================================================= */
+const tipEl = document.createElement("div");
+tipEl.className = "tip";
+tipEl.setAttribute("role", "tooltip");
+document.body.appendChild(tipEl);
+let tipTarget = null;
+
+function positionTip(el){
+  const r = el.getBoundingClientRect();
+  tipEl.style.left = "0px"; tipEl.style.top = "0px";   // 先归零再量尺寸
+  const tw = tipEl.offsetWidth, th = tipEl.offsetHeight;
+  const cx = r.left + r.width / 2;
+  let left = Math.max(8, Math.min(cx - tw / 2, window.innerWidth - tw - 8));
+  let top = r.top - th - 8, below = false;
+  if (top < 8){ top = r.bottom + 8; below = true; }   // 上方放不下则翻到下方
+  tipEl.classList.toggle("below", below);
+  tipEl.style.left = left + "px";
+  tipEl.style.top = top + "px";
+  tipEl.style.setProperty("--tip-ax", Math.max(10, Math.min(cx - left, tw - 10)) + "px");
+}
+
+function showTip(el){
+  const text = el.getAttribute("data-tip");
+  if (!text) return;
+  if (tipTarget && tipTarget !== el) tipTarget.classList.remove("active");
+  tipTarget = el;
+  el.classList.add("active");
+  tipEl.textContent = text;
+  tipEl.classList.add("show");
+  positionTip(el);
+}
+
+function hideTip(){
+  if (tipTarget) tipTarget.classList.remove("active");
+  tipTarget = null;
+  tipEl.classList.remove("show");
+}
+
+document.addEventListener("mouseover", e => {
+  const el = e.target.closest("[data-tip]");
+  if (el) showTip(el);
+  else if (tipTarget) hideTip();
+});
+document.addEventListener("focusin", e => {
+  const el = e.target.closest("[data-tip]");
+  if (el) showTip(el);
+});
+document.addEventListener("focusout", e => {
+  if (tipTarget && tipTarget === e.target.closest("[data-tip]")) hideTip();
+});
+// 捕获阶段：点击 ⓘ 时阻止事件冒泡到列头，避免误触发排序
+document.addEventListener("click", e => {
+  const el = e.target.closest("[data-tip]");
+  if (el && el.classList.contains("hint")){
+    e.preventDefault();
+    e.stopPropagation();
+    tipTarget === el ? hideTip() : showTip(el);
+    return;
+  }
+  if (el) showTip(el); else hideTip();
+}, true);
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") hideTip();
+  if ((e.key === "Enter" || e.key === " ") && document.activeElement
+      && document.activeElement.classList.contains("hint")){
+    e.preventDefault(); e.stopPropagation();
+    tipTarget === document.activeElement ? hideTip() : showTip(document.activeElement);
+  }
+}, true);
+window.addEventListener("scroll", hideTip, true);
+window.addEventListener("resize", hideTip);
+
+/* =========================================================================
+   8. 告警区
+   ========================================================================= */
+function clearAlerts(){ document.getElementById("alerts").innerHTML = ""; }
+
+function showAlert({title, detail, list, actions, warn}){
+  const box = document.getElementById("alerts");
+  const el = document.createElement("div");
+  el.className = "alert" + (warn ? " warn" : "");
+  el.innerHTML = `
+    <span class="ic">${warn ? "⚠️" : "⛔"}</span>
+    <div class="body">
+      <div class="title">${esc(title)}</div>
+      <div class="detail">${esc(detail || "")}</div>
+      ${list && list.length ? `<ul>${list.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
+      ${actions && actions.length ? `<div class="alert-actions"></div>` : ""}
+    </div>
+    <button class="close" aria-label="关闭">✕</button>`;
+  el.querySelector(".close").addEventListener("click", () => el.remove());
+  if (actions && actions.length){
+    const holder = el.querySelector(".alert-actions");
+    actions.forEach(a => {
+      const b = document.createElement("button");
+      b.className = "btn sm" + (a.primary ? " primary" : "");
+      b.textContent = a.label;
+      b.addEventListener("click", a.onClick);
+      holder.appendChild(b);
+    });
+  }
+  box.appendChild(el);
+}
+
+/* =========================================================================
+   9. 设置面板
+   ========================================================================= */
+const modal      = document.getElementById("modal");
+const keyInput   = document.getElementById("keyInput");
+const keyStatus  = document.getElementById("keyStatus");
+
+function openModal(){
+  keyInput.value = state.apiKey || "";
+  keyInput.type = "password";
+  keyStatus.className = "status-line";
+  keyStatus.innerHTML = state.apiKey
+    ? `<span style="color:var(--ok)">✓</span> <span>当前已保存密钥，点击右侧 👁 可完整查看</span>`
+    : "";
+  modal.hidden = false;
+  setTimeout(() => keyInput.focus(), 30);
+}
+function closeModal(){ modal.hidden = true; }
+
+document.getElementById("settingsBtn").addEventListener("click", openModal);
+document.getElementById("modalClose").addEventListener("click", closeModal);
+document.getElementById("cancelBtn").addEventListener("click", closeModal);
+modal.addEventListener("click", e => { if (e.target === modal) closeModal(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !modal.hidden) closeModal(); });
+
+document.getElementById("toggleReveal").addEventListener("click", () => {
+  keyInput.type = keyInput.type === "password" ? "text" : "password";
+});
+
+document.getElementById("clearKeyBtn").addEventListener("click", () => {
+  localStorage.removeItem(LS_KEY);
+  state.apiKey = "";
+  state.rows.forEach(r => { r.status = "idle"; r.d = {}; r.err = null; });
+  state.dataTs = null; state.lastRefresh = null;
+  keyInput.value = "";
+  keyStatus.className = "status-line";
+  keyStatus.innerHTML = `<span>已清除本机保存的密钥。</span>`;
+  clearAlerts();
+  render();
+});
+
+document.getElementById("saveKeyBtn").addEventListener("click", validateAndSave);
+keyInput.addEventListener("keydown", e => { if (e.key === "Enter") validateAndSave(); });
+
+async function validateAndSave(){
+  const key = keyInput.value.trim();
+  const btn = document.getElementById("saveKeyBtn");
+  if (!key){
+    keyStatus.className = "status-line bad";
+    keyStatus.innerHTML = "✕ 请输入 API 密钥";
+    return;
+  }
+  btn.disabled = true;
+  keyStatus.className = "status-line busy";
+  keyStatus.innerHTML = `<span class="spinner"></span><span>正在验证…</span>`;
+  try{
+    await rawGet("/api/fund/market/snapshot", { thscode: "513100.SH" }, key);
+    localStorage.setItem(LS_KEY, key);
+    state.apiKey = key;
+    keyStatus.className = "status-line ok";
+    keyStatus.innerHTML = "✓ 验证成功，密钥已保存到本机";
+    clearAlerts();
+    render();
+    setTimeout(() => { closeModal(); refreshAll(); }, 550);
+  }catch(e){
+    keyStatus.className = "status-line bad";
+    const tip = e.kind === "auth" ? "请检查密钥是否复制完整、是否已过期或被吊销"
+              : e.kind === "network" ? "请检查网络连接、代理或浏览器插件拦截"
+              : "请稍后重试";
+    keyStatus.innerHTML = `✕ ${esc(e.message)}<br><span style="color:var(--fg-muted)">${esc(tip)}</span>`;
+  }finally{
+    btn.disabled = false;
+  }
+}
+
+/* =========================================================================
+   10. 启动
+   ========================================================================= */
+document.getElementById("refreshBtn").addEventListener("click", refreshAll);
+window.openModal = openModal;
+
+render();
+if (state.apiKey) refreshAll();
+</script>
+</body>
+</html>
