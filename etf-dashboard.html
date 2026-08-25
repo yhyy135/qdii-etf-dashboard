@@ -790,6 +790,7 @@ async function refreshAll(){
 
   const fatal = [];
   const bpTask = fetchBuypoint();      // 与行情并行，互不阻塞
+  await ensureFundInfo();              // 通常早已就绪、瞬间返回；只有上一次引导失败过才会在这里重试
   await Promise.all(ETFS.map(async meta => {
     try{ await fetchOne(meta, state.apiKey); }
     catch(e){
@@ -934,6 +935,27 @@ async function fetchFundInfo(){
     // 静默退回 fetchOne() 里的直连路径，不打断页面加载、不弹错误提示。
     state.fundInfoAvailable = false;
   }
+}
+
+/**
+ * 引导一次基金资料缓存，成功后不会再重试——这才是"访问页面时获取一次"的真正含义。
+ *
+ * 单单在启动时调一次 fetchFundInfo() 是不够的：部署刚重启、后端首次计算还没跑完时，
+ * 那一次调用会失败并把 fundInfoAvailable 锁定在 false，而 fetchFundInfo() 全文件
+ * 只有这一处调用点——没有任何后续机会重试，用户会在整个页面会话里被永久钉在
+ * "每次刷新都全量直连 Fuyao" 的降级路径上，直到手动刷新页面。（用真实部署复现过：
+ * 一次引导失败后，即便后端几十秒后已经算完，24 只标的的 profile/detail +
+ * performance/returns 请求会一直打下去，共 100+ 次，而不是该有的 0 次。）
+ *
+ * 用共享的 in-flight Promise 而不是每次都新开一次请求：这样启动时的自动引导，和用户
+ * 在它完成前就手快点了「刷新」按钮触发的并发调用，只会打一次 /api/fund-info，不会
+ * 重复请求，也不会互相打架。
+ */
+let fundInfoPromise = null;
+async function ensureFundInfo(){
+  if (state.fundInfoAvailable) return;
+  if (!fundInfoPromise) fundInfoPromise = fetchFundInfo().finally(() => { fundInfoPromise = null; });
+  await fundInfoPromise;
 }
 
 async function fetchDetail(code){
@@ -1661,12 +1683,13 @@ document.getElementById("refreshBtn").addEventListener("click", refreshAll);
 window.openModal = openModal;
 
 onRoute();
-// 基金资料只在页面加载时取一次（见 fetchFundInfo 注释），必须先于 refreshAll() 落定，
-// 这样 fetchOne() 才知道该走缓存分支还是直连 Fuyao 的老路径。
-fetchFundInfo().then(() => {
-  if (state.apiKey) refreshAll();
-  else if (apiBase() !== null) fetchBuypoint().then(render);
-});
+// 页面加载时预取一次基金资料（不需要 apiKey，同源后端随时能取）。不必等它完成再决定
+// 要不要开始刷新价格——refreshAll() 自己也会在需要时调用 ensureFundInfo()（比如这次
+// 预取失败了、或后端当时还没算完），两处共享同一个 in-flight Promise，不会重复请求，
+// 也不会让加载动画多等一拍才出现。
+ensureFundInfo();
+if (state.apiKey) refreshAll();
+else if (apiBase() !== null) fetchBuypoint().then(render);
 </script>
 </body>
 </html>
