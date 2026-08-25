@@ -19,17 +19,32 @@ export function createStore(file = "/data/buypoint.db") {
   if (file !== ":memory:") mkdirSync(dirname(file), { recursive: true });
   const db = new DatabaseSync(file);
 
-  db.exec(`
-    PRAGMA journal_mode = WAL;
-    PRAGMA synchronous = NORMAL;
-    CREATE TABLE IF NOT EXISTS kv (
-      k        TEXT PRIMARY KEY,
-      v        TEXT NOT NULL,
-      expires  INTEGER,           -- epoch ms；NULL 表示永不过期
-      updated  INTEGER NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS kv_expires ON kv(expires);
-  `);
+  try {
+    db.exec(`
+      PRAGMA journal_mode = WAL;
+      PRAGMA synchronous = NORMAL;
+      CREATE TABLE IF NOT EXISTS kv (
+        k        TEXT PRIMARY KEY,
+        v        TEXT NOT NULL,
+        expires  INTEGER,           -- epoch ms；NULL 表示永不过期
+        updated  INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS kv_expires ON kv(expires);
+    `);
+  } catch (e) {
+    // errcode 8 = SQLITE_READONLY，几乎总是宿主机 bind mount 的所有权与容器内非 root
+    // 用户（uid 10001）不匹配。用 named volume（docker-compose.yml 默认配置）不会遇到这个问题；
+    // 若你手动改成了 bind mount，需要先 `sudo chown -R 10001:10001` 挂载的宿主机目录。
+    if (e.errcode === 8 || /readonly database/i.test(e.message)) {
+      throw new Error(
+        `无法写入数据库 ${file}（SQLITE_READONLY）。这通常是 bind mount 的宿主机目录所有权` +
+        `与容器内非 root 用户（uid 10001）不匹配导致的。docker-compose.yml 默认用 named volume ` +
+        `规避此问题；若你改成了 bind mount，请先执行 ` +
+        `\`sudo chown -R 10001:10001 <宿主机挂载目录>\` 再重启容器。`
+      );
+    }
+    throw e;
+  }
 
   const selectStmt = db.prepare("SELECT v, expires FROM kv WHERE k = ?");
   const upsertStmt = db.prepare(

@@ -14,7 +14,16 @@ services:
       - "127.0.0.1:8787:8787"
 
     volumes:
-      - ./data:/data
+      # 用 named volume 而不是 bind mount（./data:/data）——
+      # 这不是偏好问题，是绕不开的坑：Dockerfile 里 `chown app:app /data` 只作用于镜像层，
+      # 换成 bind mount 后，运行期这层所有权会被宿主机目录的所有权完全覆盖（Docker 的标准行为）。
+      # 在 Linux VPS 上，若 ./data 此前不存在，compose 会以 root 创建它；容器内非 root 用户
+      # （app, uid 10001）就只能读不能写，SQLite 建表时报 "attempt to write a readonly database"。
+      # 这个坑在 macOS/OrbStack 上测不出来，因为它们的虚拟化文件系统会把宿主机文件伪装成
+      # 容器内访问者的 UID，只有真正的 Linux 宿主机才会原样保留所有权。
+      # named volume 由 Docker 自己管理，首次创建时会继承镜像里已经 chown 好的所有权，
+      # 与宿主机权限无关，在任何 Linux 发行版上行为一致。
+      - etf-data:/data
 
     environment:
       FUYAO_API_KEY: ${FUYAO_API_KEY:?需要在 .env 里设置}
@@ -26,3 +35,10 @@ services:
     logging:
       driver: json-file
       options: { max-size: "10m", max-file: "3" }
+
+volumes:
+  etf-data:
+    # 如果你确实需要直接在宿主机上访问 buypoint.db（比如用宿主机的 cron 做外部备份），
+    # 可以改回 bind mount，但必须先手动把宿主机目录的所有权改成容器内 app 用户的 uid：
+    #   mkdir -p ./data && sudo chown -R 10001:10001 ./data
+    # 然后把上面的 `etf-data:/data` 换回 `./data:/data`，并删掉这个 volumes 顶层块。

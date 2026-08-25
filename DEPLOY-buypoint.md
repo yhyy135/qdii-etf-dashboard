@@ -139,7 +139,55 @@ Cloudflare 的访问日志和分析面板，而且 GET 响应可能被 CDN 缓�
 
 ### 数据
 
-SQLite 库在 `./data/buypoint.db`（挂卷持久化，容器重建不丢基线）。备份直接拷这个文件即可。
+SQLite 库存在名为 `etf-data` 的 Docker named volume 里（不是 bind mount），容器重建不丢基线。
+
+**为什么不用 `./data:/data` 这种 bind mount：** Dockerfile 里 `chown app:app /data` 只作用于
+镜像层，换成 bind mount 后运行期这层所有权会被宿主机目录的所有权完全覆盖。在 Linux VPS 上，
+若宿主机目录此前不存在，`docker compose up` 会以 root 创建它，容器内非 root 用户（app, uid 10001）
+就只能读不能写，SQLite 建表时会报 `attempt to write a readonly database`。named volume 由 Docker
+自己管理，首次创建时会继承镜像里已经 chown 好的所有权，与宿主机权限无关。
+
+备份：
+
+```bash
+docker run --rm -v etf-data:/data -v "$(pwd)":/backup alpine \
+  cp /data/buypoint.db /backup/buypoint.db.bak
+```
+
+如果确实需要直接在宿主机上访问这个文件（比如用宿主机 cron 做外部备份），可以改回 bind mount，
+但必须先 `mkdir -p ./data && sudo chown -R 10001:10001 ./data`，`docker-compose.yml` 里也写了
+对应注释。
+
+---
+
+## 🛠 故障排查：容器启动报 "attempt to write a readonly database"
+
+```
+Error: attempt to write a readonly database
+  code: 'ERR_SQLITE_ERROR', errcode: 8
+```
+
+**原因：** 用了旧版本的 `docker-compose.yml`（bind mount `./data:/data`），且宿主机上的
+`./data` 目录所有者不是容器内的 uid 10001（常见于目录被 Docker 以 root 自动创建，或此前
+用不同配置起过容器）。
+
+**修复：**
+
+1. 确认 `server/docker-compose.yml` 里 `volumes:` 用的是 `etf-data:/data`（named volume），
+   不是 `./data:/data`。这是默认写法，若你的仓库还是旧版本，`git pull` 更新即可。
+2. 若之前已经跑起来过、留下了权限错误的 `./data` 目录：
+
+   ```bash
+   docker compose down
+   rm -rf ./data          # 只是缓存的基线数据，可以放心删，重启会自动重算
+   docker compose up -d --build
+   ```
+
+3. 若你确实想继续用 bind mount（比如需要宿主机 cron 直接访问库文件），必须先修目录所有权：
+
+   ```bash
+   mkdir -p ./data && sudo chown -R 10001:10001 ./data
+   ```
 
 ---
 
