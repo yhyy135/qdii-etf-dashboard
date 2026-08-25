@@ -20,12 +20,17 @@
 
 同花顺金融数据 API（`https://fuyao.aicubes.cn`），请求头 `X-api-key`，已验证支持跨域（CORS）。
 
-| 表格字段 | 来源接口 |
-|---|---|
-| 价格 / 涨跌幅 / 最高 / 最低 | `GET /api/fund/market/snapshot` |
-| 净值 / 规模 / 基金公司 | `GET /api/fund/profile/detail`（`fund_type=exchange`） |
-| 年涨跌幅 | `GET /api/fund/performance/returns` |
-| 溢价率 | 本地计算：场内价 ÷ unit_nav − 1 |
+| 表格字段 | 来源接口 | 刷新频率 |
+|---|---|---|
+| 价格 / 涨跌幅 / 最高 / 最低 | `GET /api/fund/market/snapshot` | 每次点「刷新」都重新获取 |
+| 净值 / 规模 / 基金公司 | `GET /api/fund/profile/detail`（`fund_type=exchange`） | 一天一次 |
+| 年涨跌幅 | `GET /api/fund/performance/returns` | 一天一次 |
+| 溢价率 | 本地计算：场内价 ÷ unit_nav − 1 | 随价格实时重算 |
+
+净值/规模/基金公司/年涨跌幅这几项本身一天只变一次（净值就是按估值日发布的），没必要每次刷新都重拉。
+**部署了配套后端时**，这几项由后端每天缓存一次到 SQLite，前端页面加载时向后端读一次（`GET /api/fund-info`），
+之后点「刷新」只重拉价格，不再重复直连 Fuyao——单次刷新对 Fuyao 的请求数从 24×3=72 降到 24。
+**没有部署后端**（纯前端单文件模式）时自动退回老路径：每次刷新都直连 Fuyao 现拉这几项，不影响可用性，只是请求数更多。
 
 **溢价率是估算值**：该 API 不提供盘中 IOPV，QDII 净值按 T‑1/T‑2 披露且不含当日美股涨跌，仅适合同类标的横向比较，不能直接当套利依据。`跟踪指数` 一列取自 `ETF_LIST.md` 的静态标注。
 
@@ -132,6 +137,7 @@ curl -X POST -H "Authorization: Bearer 你的ADMIN_TOKEN" https://你的域名/a
 | `/` `/etf-dashboard.html` | GET | 看板本体 |
 | `/api/buypoint` | GET | 全部标的分级汇总（CDN 缓存 60s） |
 | `/api/buypoint/{代码}` | GET | 单只 60 日逐日明细 |
+| `/api/fund-info` | GET | 净值/规模/基金公司/年涨跌幅（一天缓存一次，CDN 缓存 5min） |
 | `/health` | GET | 健康检查 |
 | `/api/refresh` | POST | 手动重算，需 `Authorization: Bearer <ADMIN_TOKEN>` |
 

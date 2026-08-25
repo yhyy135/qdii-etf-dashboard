@@ -62,32 +62,48 @@ export async function runPipeline({ kv, apiKey, force = false, log = () => {} })
     return { skipped: true, reason: "非交易日", date: today, calendarSource };
   }
 
-  // ── 第一步：快照 + 净值，筛出溢价 > 阈值的子集 ────────────────────────
-  const navStore = (await kv.get("nav:store", "json")) || {};
-  let navDirty = false;
+  // ── 第一步：快照 + 基金资料，筛出溢价 > 阈值的子集 ────────────────────
+  //
+  // 净值、规模、基金公司、年涨跌幅这几项一天只变一次（净值本身就是按估值日发布的，
+  // 规模/公司名/区间收益更新更慢），没必要每次调度都重拉，按"代码+日期"缓存到 KV，
+  // 当天只在第一次遇到该标的时刷新，其余场次直接复用。这份缓存同时也是
+  // GET /api/fund-info 的数据源，供前端页面加载时读一次、不必每次点刷新都打 Fuyao。
+  const infoEnvelope = (await kv.get("fundinfo", "json")) || { updatedAt: null, items: {} };
+  const infoStore = infoEnvelope.items;
+  let infoDirty = false;
 
   const live = await mapLimit(ETFS, CONCURRENCY, async (e) => {
     try {
       requests++;
       const snap = await fuyao.snapshot(e.ths, apiKey);
 
-      const cached = navStore[e.code];
+      const cached = infoStore[e.code];
       let nav = cached?.nav ?? null;
       if (!cached || cached.date !== today) {
         try {
-          requests++;
-          const prof = await fuyao.profile(e.ths, apiKey);
-          if (prof?.nav > 0) { nav = prof.nav; navStore[e.code] = { nav, date: today }; navDirty = true; }
+          requests += 2;
+          const [prof, ret] = await Promise.all([
+            fuyao.profile(e.ths, apiKey),
+            fuyao.returns(e.ths, apiKey).catch(() => null)   // 年涨跌幅拿不到不影响主流程，静默降级
+          ]);
+          if (prof?.nav > 0) {
+            nav = prof.nav;
+            infoStore[e.code] = {
+              nav: prof.nav, scale: prof.scale, name: prof.name, mgmt: prof.mgmt,
+              ytd: ret?.ytd ?? null, y1: ret?.y1 ?? null, date: today
+            };
+            infoDirty = true;
+          }
         } catch (err) {
           // 净值拉不到就先用昨天的：净值日间变动远小于 2% 这个阈值的判别力，用于筛选是安全的
           if (nav == null) throw err;
-          log("warn", `${e.code} 净值刷新失败，沿用 ${cached.date}：${err.message}`);
+          log("warn", `${e.code} 基金资料刷新失败，沿用 ${cached.date}：${err.message}`);
         }
       }
 
       if (!snap?.price) return { e, error: "快照缺失", retry: true };
       if (!(nav > 0)) return { e, error: "净值缺失", retry: true };
-      return { e, price: snap.price, nav, navStale: navStore[e.code]?.date !== today ? cached?.date : null,
+      return { e, price: snap.price, nav, navStale: infoStore[e.code]?.date !== today ? cached?.date : null,
                prem: (snap.price / nav - 1) * 100 };
     } catch (err) {
       // 2001/2003 是鉴权失败（Key 缺失/无效/无权限）——不会随时间自愈，值得显眼报错。
@@ -98,7 +114,7 @@ export async function runPipeline({ kv, apiKey, force = false, log = () => {} })
       return { e, error: err.message, retry: !authFailure };
     }
   });
-  if (navDirty) await kv.put("nav:store", navStore, { expirationTtl: 30 * 86400 });
+  if (infoDirty) await kv.put("fundinfo", { updatedAt: now, items: infoStore }, { expirationTtl: 30 * 86400 });
 
   const triggered = live.filter(r => !r.error && r.prem > TRIGGER_PREMIUM && !r.e.noMarketHistory);
   log("info", `${today} 快照完成，${triggered.length}/${ETFS.length} 只溢价 > ${TRIGGER_PREMIUM}%`);

@@ -476,7 +476,9 @@ input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--a
     <b>溢价率</b> = 场内最新价 ÷ 最新公布单位净值 − 1。QDII 基金净值按 T‑1/T‑2 披露，且不含当日美股涨跌，因此该值为<b>估算溢价</b>，与交易所盘中 IOPV 存在偏差，仅供横向比较参考。
     <b>规模</b>取基金最新披露的资产净值（元→亿元）。
     <b>年涨跌幅</b>为<b>今年以来</b>净值收益率（悬停可见近1年）。
-    数据源 <code>fuyao.aicubes.cn</code>（同花顺金融数据 API），行情为交易时段快照，非逐笔实时推送。<br>
+    数据源 <code>fuyao.aicubes.cn</code>（同花顺金融数据 API），行情为交易时段快照，非逐笔实时推送。
+    <b>价格/涨跌幅</b>每次点「刷新」都会重新获取；<b>净值/规模/基金公司/年涨跌幅</b>本身一天只变一次，
+    部署了配套后端时由后端每天缓存一次，页面加载时读一次即可，点「刷新」不会重复拉取这几项。<br>
     本页面仅做数据展示，不构成任何投资建议。
   </p>
 </div>
@@ -593,7 +595,13 @@ const state = {
   bpByCode: new Map(),    // code -> item
   bpErr: null,
   bpLoading: false,
-  detail: { code: null, data: null, loading: false, err: null }
+  detail: { code: null, data: null, loading: false, err: null },
+
+  // 基金资料缓存（净值/规模/基金公司/年涨跌幅）：这几项一天只变一次，页面加载时
+  // 向同源后端取一次即可，不必每次点刷新都重新直连 Fuyao。没有同源后端（纯前端/
+  // file:// 打开）时 fundInfoAvailable 为 false，fetchOne() 会退回逐次直连的老路径。
+  fundInfo: new Map(),    // code -> {nav, scale, name, mgmt, ytd, y1, date}
+  fundInfoAvailable: false
 };
 
 // 初始化行占位
@@ -695,11 +703,19 @@ const first = d => (d && Array.isArray(d.item) && d.item.length) ? d.item[0] : n
    5. 数据获取
    ========================================================================= */
 async function fetchOne(meta, key){
-  const [snapR, profR, retR] = await Promise.allSettled([
-    apiGet("/api/fund/market/snapshot", { thscode: meta.ths }, key),
-    apiGet("/api/fund/profile/detail",  { fund_type: "exchange", thscode: meta.ths }, key),
-    apiGet("/api/fund/performance/returns", { fund_type: "exchange", thscode: meta.ths }, key)
-  ]);
+  // 净值/规模/基金公司/年涨跌幅这几项，同源后端有缓存时就不再重复直连 Fuyao——
+  // 详见 fetchFundInfo()。没有后端（或后端暂不可用）时退回老路径，每次都现拉，
+  // 保证纯前端单文件模式（无需部署任何东西）依然完整可用。
+  const cachedInfo = state.fundInfoAvailable ? state.fundInfo.get(meta.code) : null;
+
+  const tasks = [ apiGet("/api/fund/market/snapshot", { thscode: meta.ths }, key) ];
+  if (!cachedInfo){
+    tasks.push(
+      apiGet("/api/fund/profile/detail",  { fund_type: "exchange", thscode: meta.ths }, key),
+      apiGet("/api/fund/performance/returns", { fund_type: "exchange", thscode: meta.ths }, key)
+    );
+  }
+  const [snapR, profR, retR] = await Promise.allSettled(tasks);
 
   const d = {};
   const errs = [];
@@ -715,20 +731,29 @@ async function fetchOne(meta, key){
     d.snapTs  = snapR.value && snapR.value.timestamp || null;
   } else errs.push(snapR.reason);
 
-  if (profR.status === "fulfilled"){
-    const p = first(profR.value) || {};
-    d.nav      = num(p.unit_nav);
-    d.scale    = p.fund_scale == null ? null : num(p.fund_scale) / 1e8;  // 元 -> 亿元
-    d.apiName  = p.fund_name || null;
-    d.mgmt     = p.mgmt_name || null;
-    d.manager  = p.manager_name || null;
-  } else errs.push(profR.reason);
+  if (cachedInfo){
+    d.nav     = num(cachedInfo.nav);
+    d.scale   = cachedInfo.scale == null ? null : num(cachedInfo.scale) / 1e8;  // 元 -> 亿元
+    d.apiName = cachedInfo.name || null;
+    d.mgmt    = cachedInfo.mgmt || null;
+    d.ytd     = num(cachedInfo.ytd);
+    d.y1      = num(cachedInfo.y1);
+  } else {
+    if (profR && profR.status === "fulfilled"){
+      const p = first(profR.value) || {};
+      d.nav      = num(p.unit_nav);
+      d.scale    = p.fund_scale == null ? null : num(p.fund_scale) / 1e8;  // 元 -> 亿元
+      d.apiName  = p.fund_name || null;
+      d.mgmt     = p.mgmt_name || null;
+      d.manager  = p.manager_name || null;
+    } else if (profR) errs.push(profR.reason);
 
-  if (retR.status === "fulfilled"){
-    const r = first(retR.value) || {};
-    d.ytd   = num(r.return_nowyear);
-    d.y1    = num(r.return_year);
-  } else errs.push(retR.reason);
+    if (retR && retR.status === "fulfilled"){
+      const r = first(retR.value) || {};
+      d.ytd   = num(r.return_nowyear);
+      d.y1    = num(r.return_year);
+    } else if (retR) errs.push(retR.reason);
+  }
 
   // 估算溢价率
   d.premium = (d.price != null && d.nav != null && d.nav > 0)
@@ -885,6 +910,29 @@ async function fetchBuypoint(){
           : e.message);
   }finally{
     state.bpLoading = false;
+  }
+}
+
+/**
+ * 基金资料（净值/规模/基金公司/年涨跌幅）：一天只变一次，页面加载时向同源后端取一次，
+ * 之后每次点「刷新」只重拉实时价格，不再重复请求。
+ * 6 秒超时——后端不可达时应尽快判定失败、退回 fetchOne() 里逐次直连 Fuyao 的老路径，
+ * 不能让页面首次加载卡等一个可能根本没部署的后端。
+ */
+async function fetchFundInfo(){
+  const base = apiBase();
+  if (base === null){ state.fundInfoAvailable = false; return; }
+  try{
+    const r = await fetch(base + "/api/fund-info", { cache: "no-store", signal: AbortSignal.timeout(6000) });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const data = await r.json();
+    const entries = Object.entries(data.items || {});
+    state.fundInfo = new Map(entries);
+    state.fundInfoAvailable = entries.length > 0;
+  }catch(e){
+    // 同源没部署后端、部署了但还没算出数据、请求超时——都当作"用不了"处理，
+    // 静默退回 fetchOne() 里的直连路径，不打断页面加载、不弹错误提示。
+    state.fundInfoAvailable = false;
   }
 }
 
@@ -1613,8 +1661,12 @@ document.getElementById("refreshBtn").addEventListener("click", refreshAll);
 window.openModal = openModal;
 
 onRoute();
-if (state.apiKey) refreshAll();
-else if (apiBase() !== null) fetchBuypoint().then(render);
+// 基金资料只在页面加载时取一次（见 fetchFundInfo 注释），必须先于 refreshAll() 落定，
+// 这样 fetchOne() 才知道该走缓存分支还是直连 Fuyao 的老路径。
+fetchFundInfo().then(() => {
+  if (state.apiKey) refreshAll();
+  else if (apiBase() !== null) fetchBuypoint().then(render);
+});
 </script>
 </body>
 </html>

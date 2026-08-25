@@ -113,13 +113,25 @@ const server = createServer(async (req, res) => {
       return json(res, { error: why, code, status: it.status, name: it.name }, 404);
     }
 
+    // 净值/规模/基金公司/年涨跌幅：一天只变一次，前端页面加载时读一次即可，不必每次点
+    // 刷新都直连 Fuyao 重拉。max-age 给到 5 分钟——数据实际上一天才变一次，但留短一点
+    // 的缓存期方便部署后很快就能通过重新访问验证到最新结果，不必死等一整天。
+    if (path === "/api/fund-info" && req.method === "GET") {
+      const data = await store.get("fundinfo", "json");
+      if (!data || !data.items || !Object.keys(data.items).length)
+        return json(res, { error: "尚无数据，等待首次计算完成" }, 503);
+      return json(res, data, 200, "public, max-age=300, s-maxage=300");
+    }
+
     if (path === "/health") {
       const data = await store.get("latest", "json");
+      const info = await store.get("fundinfo", "json");
       const err = await store.get("lastError", "json");
       return json(res, {
         ok: true, service: "etf-buypoint",
         hasData: !!data, updatedAt: data?.updatedAt || null, date: data?.date || null,
         counts: data?.counts || null, computing: !!running,
+        fundInfo: { updatedAt: info?.updatedAt || null, count: info ? Object.keys(info.items || {}).length : 0 },
         nextRun: nextFireText(TIMES), store: store.stats(), lastError: err || null
       });
     }

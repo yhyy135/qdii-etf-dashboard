@@ -67,10 +67,16 @@ export async function snapshot(ths, key) {
   return it ? { price: it.last_price, prevPrice: it.prev_price, changePct: it.price_change_ratio_pct } : null;
 }
 
-/** 基金资料：最新单位净值、规模 */
+/** 基金资料：最新单位净值、规模、基金公司 */
 export async function profile(ths, key) {
   const it = items(await get("/api/fund/profile/detail", { fund_type: "exchange", thscode: ths }, key))[0];
-  return it ? { nav: it.unit_nav, scale: it.fund_scale, name: it.fund_name } : null;
+  return it ? { nav: it.unit_nav, scale: it.fund_scale, name: it.fund_name, mgmt: it.mgmt_name } : null;
+}
+
+/** 区间收益：今年以来 / 近1年涨跌幅 */
+export async function returns(ths, key) {
+  const it = items(await get("/api/fund/performance/returns", { fund_type: "exchange", thscode: ths }, key))[0];
+  return it ? { ytd: it.return_nowyear, y1: it.return_year } : null;
 }
 
 /**
