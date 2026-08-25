@@ -85,12 +85,17 @@ export async function runPipeline({ kv, apiKey, force = false, log = () => {} })
         }
       }
 
-      if (!snap?.price) return { e, error: "快照缺失" };
-      if (!(nav > 0)) return { e, error: "净值缺失" };
+      if (!snap?.price) return { e, error: "快照缺失", retry: true };
+      if (!(nav > 0)) return { e, error: "净值缺失", retry: true };
       return { e, price: snap.price, nav, navStale: navStore[e.code]?.date !== today ? cached?.date : null,
                prem: (snap.price / nav - 1) * 100 };
     } catch (err) {
-      return { e, error: err.message };
+      // 2001/2003 是鉴权失败（Key 缺失/无效/无权限）——不会随时间自愈，值得显眼报错。
+      // 其余一律按可重试处理：多数是 fuyao.js 里 7 次重试都没扛住的尾部抖动（按实测概率，
+      // 91 个请求的一轮里约 3% 会漏网至少一个），下一次调度（不到一小时后）几乎总能恢复。
+      // 混为一谈会导致"分级"列显示吓人的错误图标，而实际上什么都没坏，纯粹是运气不好。
+      const authFailure = err.code === 2001 || err.code === 2003;
+      return { e, error: err.message, retry: !authFailure };
     }
   });
   if (navDirty) await kv.put("nav:store", navStore, { expirationTtl: 30 * 86400 });
@@ -169,7 +174,15 @@ export async function runPipeline({ kv, apiKey, force = false, log = () => {} })
       indexVerified: e.verified !== false, proxy: e.proxy || null
     };
 
-    if (r.error) { items.push({ ...row, status: "error", message: r.error }); continue; }
+    if (r.error) {
+      // retry:true（绝大多数情况）= 抖动/网络问题，下一次调度会自动重试，UI 显示为"待补"而非"报错"
+      items.push({
+        ...row,
+        status: r.retry ? "pending" : "error",
+        message: r.retry ? `暂时获取不到行情/净值（${r.error}），下一次调度会自动重试` : r.error
+      });
+      continue;
+    }
 
     row.price = r.price; row.nav = r.nav; row.prem = r.prem;
     if (r.navStale) row.navStale = r.navStale;
