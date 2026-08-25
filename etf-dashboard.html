@@ -504,18 +504,6 @@ input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--a
         ⚠️ 密钥以<b>明文</b>保存在本浏览器的 localStorage 中，不会上传到本站以外的任何服务器。
         在公共 / 共享电脑上使用后，请点击「清除密钥」。
       </div>
-
-      <label class="fl" for="workerInput" style="margin-top:20px">买点分级服务地址（可选）</label>
-      <div class="input-row">
-        <input type="text" id="workerInput" placeholder="https://etf-buypoint-worker.xxx.workers.dev" autocomplete="off" spellcheck="false">
-      </div>
-      <p class="help">
-        <b>与后端同源部署时留空即可</b>（后端会把本页一并托管，自动生效）。<br>
-        看板单独部署在别处（如 Cloudflare Pages / 本地文件）时，才需要在这里填后端地址。<br>
-        指数维度必须走后端：Yahoo Finance 不返回跨域响应头，浏览器无法直连取指数点位。
-        该服务用它<b>自己的</b> API Key，与上面这把互不相干。
-      </p>
-      <div class="status-line" id="workerStatus"></div>
     </div>
     <div class="modal-foot">
       <button class="btn" id="clearKeyBtn">清除密钥</button>
@@ -567,7 +555,6 @@ const ETFS = [
    ========================================================================= */
 const API_BASE   = "https://fuyao.aicubes.cn";
 const LS_KEY     = "etf_dash.api_key";
-const LS_WORKER  = "etf_dash.worker_url";
 const LS_THEME   = "etf_dash.theme";
 const LS_SORT    = "etf_dash.sort";
 const MAX_CONC   = 6;      // 全局并发上限（API 超 QPS 返回 code=4001）
@@ -601,8 +588,7 @@ const state = {
   sort: { key: null, dir: 1 },
   lastRefresh: null,
 
-  // 买点分级：来自 Worker 的预计算结果（浏览器算不了指数维度 —— Yahoo 不给 CORS 头）
-  workerUrl: (localStorage.getItem(LS_WORKER) || "").replace(/\/+$/, ""),
+  // 买点分级：来自同源后端的预计算结果（浏览器算不了指数维度 —— Yahoo 不给 CORS 头）
   bp: null,               // 汇总 payload
   bpByCode: new Map(),    // code -> item
   bpErr: null,
@@ -854,11 +840,11 @@ function reportProblems(fatal){
 }
 
 /* =========================================================================
-   5b. 买点分级数据（Worker 预计算结果）
+   5b. 买点分级数据（同源后端的预计算结果）
    =========================================================================
-   指数维度必须走 Worker：实测 Yahoo Finance 的 chart 接口不返回
+   指数维度必须走后端：实测 Yahoo Finance 的 chart 接口不返回
    Access-Control-Allow-Origin，浏览器直连一律被跨域拦截，所以这一维在前端算不出来。
-   Worker 同时承担"每天只算一次基线"的职责，避免每个访客都去打 Fuyao 的限流上限。
+   后端同时承担"每天只算一次基线"的职责，避免每个访客都去打 Fuyao 的限流上限。
    ========================================================================= */
 const GRADE_TEXT = {
   A: "优质 · 指数与溢价同时处于窗口低位",
@@ -868,13 +854,12 @@ const GRADE_TEXT = {
 };
 
 /**
- * 分级服务地址。
- * 没显式配置时，默认试同源相对路径 —— 后端容器会把这个页面本身也托管出来，
- * 同源部署下既不用填地址，也没有 CORS 和混合内容问题。
+ * 分级服务地址：固定为同源相对路径。
+ * 后端容器把这个页面本身也一并托管出来，同源部署下既不需要配置，也没有 CORS 和
+ * 混合内容问题——这是唯一支持的部署形态，没有手动填地址的入口。
  * 用 file:// 直接打开时没有同源后端可言，返回 null。
  */
 function apiBase(){
-  if (state.workerUrl) return state.workerUrl;
   return location.protocol === "http:" || location.protocol === "https:" ? "" : null;
 }
 
@@ -1099,7 +1084,7 @@ function renderMeta(){
     else if (ok){ parts.push(`<span class="sep"></span><span style="color:var(--ok)">全部成功</span>`); }
     if (state.bp){
       const c2 = state.bp.counts || {};
-      parts.push(`<span class="sep"></span><span data-tip="分级由后端 Worker 每交易日滚动计算${state.bp.baselines ? `｜本轮基线：新建 ${state.bp.baselines.built.length}、复用 ${state.bp.baselines.reused.length}` : ""}">分级 <b>${c2.graded||0}</b>/<b>${c2.triggered||0}</b> 触发（阈值 ${state.bp.threshold}%）</span>`);
+      parts.push(`<span class="sep"></span><span data-tip="分级由后端每交易日滚动计算${state.bp.baselines ? `｜本轮基线：新建 ${state.bp.baselines.built.length}、复用 ${state.bp.baselines.reused.length}` : ""}">分级 <b>${c2.graded||0}</b>/<b>${c2.triggered||0}</b> 触发（阈值 ${state.bp.threshold}%）</span>`);
     } else if (state.bpErr){
       parts.push(`<span class="sep"></span><span style="color:var(--danger)" data-tip="${esc(state.bpErr)}">分级服务不可用</span>`);
     }
@@ -1182,11 +1167,11 @@ function render(){
      not_triggered  溢价未超阈值 —— 不是算失败，是压根没触发计算条件
      unsupported    该品种没有历史场内行情（LOF），建不出基线
      pending        基线还在滚动补齐，下次调度就有
-     未配置服务      用户还没填 Worker 地址
+     无服务         同源部署没有配套后端（纯前端 file:// 打开，或后端未部署）
    ========================================================================= */
 function gradeCell(meta){
   if (apiBase() === null || (!state.bp && !state.bpErr && !state.bpLoading))
-    return `<td class="num"><span class="gna" data-tip="当前没有可用的买点分级服务。若后端与本页同源部署则自动生效；否则打开「⚙️ API设置」填入服务地址。">—</span></td>`;
+    return `<td class="num"><span class="gna" data-tip="当前没有可用的买点分级服务（需与本页同源部署配套后端才会生效）。">—</span></td>`;
   if (state.bpErr)
     return `<td class="num"><span class="gna" data-tip="${esc(state.bpErr)}">!</span></td>`;
   if (!state.bp)
@@ -1554,9 +1539,6 @@ const keyInput   = document.getElementById("keyInput");
 const keyStatus  = document.getElementById("keyStatus");
 
 function openModal(){
-  document.getElementById("workerInput").value = state.workerUrl || "";
-  document.getElementById("workerStatus").innerHTML = "";
-  document.getElementById("workerStatus").className = "status-line";
   keyInput.value = state.apiKey || "";
   keyInput.type = "password";
   keyStatus.className = "status-line";
@@ -1593,55 +1575,15 @@ document.getElementById("clearKeyBtn").addEventListener("click", () => {
 document.getElementById("saveKeyBtn").addEventListener("click", validateAndSave);
 keyInput.addEventListener("keydown", e => { if (e.key === "Enter") validateAndSave(); });
 
-/** Worker 地址与 API Key 相互独立，各自校验、各自保存 */
-async function saveWorkerUrl(){
-  const raw = document.getElementById("workerInput").value.trim().replace(/\/+$/, "");
-  const st = document.getElementById("workerStatus");
-  if (raw === (state.workerUrl || "")) return true;
-
-  if (!raw){
-    localStorage.removeItem(LS_WORKER);
-    state.workerUrl = ""; state.bp = null; state.bpByCode = new Map(); state.bpErr = null;
-    st.className = "status-line"; st.innerHTML = "已移除分级服务地址";
-    return true;
-  }
-  if (!/^https?:\/\//.test(raw)){
-    st.className = "status-line bad"; st.innerHTML = "✕ 地址需以 http:// 或 https:// 开头";
-    return false;
-  }
-
-  st.className = "status-line busy";
-  st.innerHTML = `<span class="spinner"></span>正在连接分级服务…`;
-  try{
-    const r = await fetch(raw + "/health", { cache: "no-store" });
-    const j = await r.json();
-    if (!j.ok) throw new Error("服务响应异常");
-    localStorage.setItem(LS_WORKER, raw);
-    state.workerUrl = raw;
-    st.className = "status-line ok";
-    st.innerHTML = j.hasData
-      ? `✓ 已连接，最近一次计算 ${esc(j.date || "")}（已分级 ${j.counts?.graded ?? "?"} 只）`
-      : `✓ 已连接，但服务尚无数据 —— 需先调用 /api/refresh 预热，或等待下一个交易日的定时任务`;
-    return true;
-  }catch(e){
-    st.className = "status-line bad";
-    st.innerHTML = `✕ 无法连接：${esc(e.message)}<br><span style="color:var(--fg-muted)">确认 Worker 已部署且地址正确</span>`;
-    return false;
-  }
-}
-
 async function validateAndSave(){
   const key = keyInput.value.trim();
   const btn = document.getElementById("saveKeyBtn");
   if (!key){
-    await saveWorkerUrl();
-    render();
     keyStatus.className = "status-line bad";
-    keyStatus.innerHTML = "✕ 请输入 API 密钥（分级服务地址已单独保存）";
+    keyStatus.innerHTML = "✕ 请输入 API 密钥";
     return;
   }
   btn.disabled = true;
-  await saveWorkerUrl();
   keyStatus.className = "status-line busy";
   keyStatus.innerHTML = `<span class="spinner"></span><span>正在验证…</span>`;
   try{
