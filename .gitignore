@@ -1,0 +1,18 @@
+# 本地 MCP 配置：含明文 API Key，绝不入库
+.mcp.json
+
+# 本地工作产物
+.DS_Store
+.claude/
+.venv/
+mock-api/
+reports/
+cangjie-output/
+input1.md
+
+# 需求文档属于工作过程产物，不进成品仓库
+WEB_DASHBOARD_SPEC.md
+WEB_DASHBOARD_BUYPOINT_GRADING_SPEC.md
+ETF_LIST.md
+
+node_modules/

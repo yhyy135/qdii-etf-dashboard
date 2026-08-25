@@ -271,6 +271,114 @@ td.price{font-weight:600}
 .footnote{margin-top:14px;font-size:12px;color:var(--fg-subtle);line-height:1.7}
 .footnote code{font-family:var(--mono);background:var(--bg-subtle);padding:1px 5px;border-radius:4px;border:1px solid var(--border-muted)}
 
+
+/* ============ 买点分级 ============ */
+/* 等级配色刻意避开红/绿 —— 表格里红=涨绿=跌是行情语义，等级是另一套语义，
+   两者混用会让人把 A 档误读成"涨"。这里用 teal/blue/amber/slate 四色。 */
+:root{
+  --gA:#0f766e; --gA-bg:#ccfbf1; --gA-bd:#5eead4;
+  --gB:#1d4ed8; --gB-bg:#dbeafe; --gB-bd:#93c5fd;
+  --gC:#b45309; --gC-bg:#fef3c7; --gC-bd:#fcd34d;
+  --gD:#475569; --gD-bg:#e2e8f0; --gD-bd:#cbd5e1;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --gA:#5eead4; --gA-bg:#0b3b36; --gA-bd:#115e59;
+    --gB:#93c5fd; --gB-bg:#12244a; --gB-bd:#1e40af;
+    --gC:#fcd34d; --gC-bg:#3d2c07; --gC-bd:#92400e;
+    --gD:#cbd5e1; --gD-bg:#1e293b; --gD-bd:#334155;
+  }
+}
+:root[data-theme="dark"]{
+  --gA:#5eead4; --gA-bg:#0b3b36; --gA-bd:#115e59;
+  --gB:#93c5fd; --gB-bg:#12244a; --gB-bd:#1e40af;
+  --gC:#fcd34d; --gC-bg:#3d2c07; --gC-bd:#92400e;
+  --gD:#cbd5e1; --gD-bg:#1e293b; --gD-bd:#334155;
+}
+
+.badge{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:22px;height:22px;border-radius:6px;font-weight:700;font-size:12px;
+  font-family:var(--mono);border:1px solid transparent;cursor:help;
+  transition:transform .1s;
+}
+.badge:hover{transform:scale(1.12)}
+.badge.A{color:var(--gA);background:var(--gA-bg);border-color:var(--gA-bd)}
+.badge.B{color:var(--gB);background:var(--gB-bg);border-color:var(--gB-bd)}
+.badge.C{color:var(--gC);background:var(--gC-bg);border-color:var(--gC-bd)}
+.badge.D{color:var(--gD);background:var(--gD-bg);border-color:var(--gD-bd)}
+.badge.est::after{content:"~";font-size:9px;margin-left:1px;opacity:.7}
+
+.gcell{display:inline-flex;align-items:center;gap:6px;justify-content:flex-end}
+.detail-link{
+  border:none;background:none;color:var(--accent);font-size:11px;padding:2px 4px;
+  border-radius:4px;opacity:0;transition:opacity .12s;white-space:nowrap;
+}
+tbody tr:hover .detail-link{opacity:1}
+.detail-link:hover{background:var(--accent-subtle);text-decoration:underline}
+.gna{color:var(--fg-subtle);cursor:help;font-size:12px}
+
+/* ---- 详情视图 ---- */
+.detail-head{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.detail-head .t{flex:1;min-width:220px}
+.detail-head h2{margin:0 0 4px;font-size:20px;font-weight:600;letter-spacing:-.01em}
+.detail-head .meta{font-size:12px;color:var(--fg-muted)}
+.detail-head .meta code{font-family:var(--mono)}
+
+.panels{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:18px}
+.panel{border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;background:var(--surface)}
+.panel .k{font-size:11px;color:var(--fg-muted);margin-bottom:5px}
+.panel .v{font-size:22px;font-weight:600;font-family:var(--mono);font-variant-numeric:tabular-nums;line-height:1.2}
+.panel .s{font-size:11px;color:var(--fg-subtle);margin-top:4px}
+.panel.hero{display:flex;align-items:center;gap:12px}
+.panel.hero .badge{width:44px;height:44px;font-size:22px;border-radius:10px;cursor:default}
+.panel.hero .hb{min-width:0}
+.panel.hero .hb .k{margin-bottom:2px}
+.panel.hero .hb .lbl{font-size:13px;font-weight:600}
+
+.card{border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);margin-bottom:18px;overflow:hidden}
+.card > h3{
+  margin:0;padding:11px 14px;font-size:13px;font-weight:600;
+  border-bottom:1px solid var(--border-muted);background:var(--bg-subtle);
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+}
+.card > h3 .sub{font-weight:400;color:var(--fg-muted);font-size:12px}
+.card .body{padding:14px}
+
+.chart{width:100%;height:auto;display:block;overflow:visible}
+.chart text{font-family:var(--sans);fill:var(--fg-muted)}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--fg-muted);padding:0 14px 12px}
+.legend i{display:inline-block;width:14px;height:3px;border-radius:2px;margin-right:5px;vertical-align:3px}
+
+.distbar{display:flex;height:26px;border-radius:6px;overflow:hidden;border:1px solid var(--border)}
+.distbar > div{display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;min-width:0}
+.distlegend{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:var(--fg-muted)}
+.distlegend b{font-family:var(--mono)}
+
+.gridcells{display:flex;gap:2px;flex-wrap:wrap}
+.gridcells i{width:12px;height:12px;border-radius:2px;cursor:help}
+
+.notice{
+  display:flex;gap:9px;align-items:flex-start;font-size:12px;line-height:1.6;
+  padding:10px 12px;border-radius:var(--radius-sm);margin-bottom:14px;
+  border:1px solid var(--warn-border);background:var(--warn-bg);color:var(--fg);
+}
+.notice.info{border-color:var(--border);background:var(--bg-subtle);color:var(--fg-muted)}
+.notice .ic{flex:none}
+.notice b{color:var(--fg)}
+
+.dtable{width:100%;min-width:640px;border-collapse:separate;border-spacing:0}
+.dtable th{
+  position:sticky;top:0;background:var(--bg-subtle);border-bottom:1px solid var(--border);
+  padding:8px 10px;text-align:right;font-size:11px;font-weight:600;color:var(--fg-muted);white-space:nowrap;
+}
+.dtable th:first-child{text-align:left}
+.dtable td{padding:7px 10px;text-align:right;border-bottom:1px solid var(--border-muted);
+  font-family:var(--mono);font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.dtable td:first-child{text-align:left}
+.dtable tr:hover td{background:var(--bg-subtle)}
+.dtable .scroll{max-height:420px;overflow:auto}
+
 /* ============ Modal ============ */
 .modal-backdrop{
   position:fixed;inset:0;background:rgba(31,35,40,.45);z-index:100;
@@ -363,7 +471,7 @@ input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--a
 
   <div id="content"></div>
 
-  <p class="footnote">
+  <p class="footnote" id="footnote">
     <b>字段口径：</b>
     <b>溢价率</b> = 场内最新价 ÷ 最新公布单位净值 − 1。QDII 基金净值按 T‑1/T‑2 披露，且不含当日美股涨跌，因此该值为<b>估算溢价</b>，与交易所盘中 IOPV 存在偏差，仅供横向比较参考。
     <b>规模</b>取基金最新披露的资产净值（元→亿元）。
@@ -396,6 +504,18 @@ input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--a
         ⚠️ 密钥以<b>明文</b>保存在本浏览器的 localStorage 中，不会上传到本站以外的任何服务器。
         在公共 / 共享电脑上使用后，请点击「清除密钥」。
       </div>
+
+      <label class="fl" for="workerInput" style="margin-top:20px">买点分级服务地址（可选）</label>
+      <div class="input-row">
+        <input type="text" id="workerInput" placeholder="https://etf-buypoint-worker.xxx.workers.dev" autocomplete="off" spellcheck="false">
+      </div>
+      <p class="help">
+        <b>与后端同源部署时留空即可</b>（后端会把本页一并托管，自动生效）。<br>
+        看板单独部署在别处（如 Cloudflare Pages / 本地文件）时，才需要在这里填后端地址。<br>
+        指数维度必须走后端：Yahoo Finance 不返回跨域响应头，浏览器无法直连取指数点位。
+        该服务用它<b>自己的</b> API Key，与上面这把互不相干。
+      </p>
+      <div class="status-line" id="workerStatus"></div>
     </div>
     <div class="modal-foot">
       <button class="btn" id="clearKeyBtn">清除密钥</button>
@@ -447,10 +567,22 @@ const ETFS = [
    ========================================================================= */
 const API_BASE   = "https://fuyao.aicubes.cn";
 const LS_KEY     = "etf_dash.api_key";
+const LS_WORKER  = "etf_dash.worker_url";
 const LS_THEME   = "etf_dash.theme";
 const LS_SORT    = "etf_dash.sort";
 const MAX_CONC   = 6;      // 全局并发上限（API 超 QPS 返回 code=4001）
-const MAX_RETRY  = 3;
+const MAX_RETRY  = 6;
+
+/**
+ * 需要重试的业务码。
+ *
+ * 4001/5002/5003 是文档写明的临时性错误。1004/3001/3004 按文档是永久性错误，本不该重试 ——
+ * 但实测 Fuyao 会把它们当作限流的伪装随机返回：并发 6 连打 40 个请求，32.5% 收到假错误码
+ * （513300.SH 被说成"不支持行情"、159941.SZ 被说成"不存在"、ETF 被说成 fund_type 冲突），
+ * 而同一个代码隔几百毫秒重试就正常。所以这三个码一律按临时性处理。
+ * 真正永久性的错误会在重试耗尽后稳定复现，照样能暴露出来。
+ */
+const RETRIABLE_CODES = new Set([4001, 5002, 5003, 1004, 3001, 3004]);
 
 const ERR_MSG = {
   1001:"缺少必填参数", 1002:"参数格式错误", 1003:"参数取值越界", 1004:"参数冲突",
@@ -467,7 +599,15 @@ const state = {
   total: ETFS.length,
   dataTs: null,
   sort: { key: null, dir: 1 },
-  lastRefresh: null
+  lastRefresh: null,
+
+  // 买点分级：来自 Worker 的预计算结果（浏览器算不了指数维度 —— Yahoo 不给 CORS 头）
+  workerUrl: (localStorage.getItem(LS_WORKER) || "").replace(/\/+$/, ""),
+  bp: null,               // 汇总 payload
+  bpByCode: new Map(),    // code -> item
+  bpErr: null,
+  bpLoading: false,
+  detail: { code: null, data: null, loading: false, err: null }
 };
 
 // 初始化行占位
@@ -553,9 +693,10 @@ async function apiGet(path, params, key){
       try{ return await rawGet(path, params, key); }
       catch(e){
         lastErr = e;
-        const retriable = e.code === 4001 || e.code === 5002 || e.code === 5003 || e.kind === "network";
+        const retriable = RETRIABLE_CODES.has(e.code) || e.kind === "network";
         if (!retriable || i === MAX_RETRY) throw e;
-        await sleep([400, 1000, 2200][i] + Math.random() * 300);
+        // 指数退避 + 抖动，避免并发中的多个请求在同一时刻重试
+        await sleep(Math.min(2500, 300 * 2 ** i) + Math.random() * 250);
       }
     }
     throw lastErr;
@@ -637,6 +778,7 @@ async function refreshAll(){
   render();
 
   const fatal = [];
+  const bpTask = fetchBuypoint();      // 与行情并行，互不阻塞
   await Promise.all(ETFS.map(async meta => {
     try{ await fetchOne(meta, state.apiKey); }
     catch(e){
@@ -648,6 +790,8 @@ async function refreshAll(){
       renderSoon();
     }
   }));
+
+  await bpTask;
 
   // 数据时间：取所有快照中最新的一条
   let ts = null;
@@ -710,6 +854,76 @@ function reportProblems(fatal){
 }
 
 /* =========================================================================
+   5b. 买点分级数据（Worker 预计算结果）
+   =========================================================================
+   指数维度必须走 Worker：实测 Yahoo Finance 的 chart 接口不返回
+   Access-Control-Allow-Origin，浏览器直连一律被跨域拦截，所以这一维在前端算不出来。
+   Worker 同时承担"每天只算一次基线"的职责，避免每个访客都去打 Fuyao 的限流上限。
+   ========================================================================= */
+const GRADE_TEXT = {
+  A: "优质 · 指数与溢价同时处于窗口低位",
+  B: "可接受 · 溢价处于低位，指数位置一般",
+  C: "回撤型 · 指数已回撤但溢价不低",
+  D: "谨慎 · 两个维度都不在低位"
+};
+
+/**
+ * 分级服务地址。
+ * 没显式配置时，默认试同源相对路径 —— 后端容器会把这个页面本身也托管出来，
+ * 同源部署下既不用填地址，也没有 CORS 和混合内容问题。
+ * 用 file:// 直接打开时没有同源后端可言，返回 null。
+ */
+function apiBase(){
+  if (state.workerUrl) return state.workerUrl;
+  return location.protocol === "http:" || location.protocol === "https:" ? "" : null;
+}
+
+async function fetchBuypoint(){
+  const base = apiBase();
+  if (base === null){ state.bp = null; state.bpByCode = new Map(); state.bpErr = null; return; }
+  state.bpLoading = true; state.bpErr = null;
+  try{
+    const r = await fetch(base + "/api/buypoint", { cache: "no-store" });
+    if (!r.ok){
+      const j = await r.json().catch(() => null);
+      throw new Error(j?.error || `HTTP ${r.status}`);
+    }
+    const data = await r.json();
+    state.bp = data;
+    state.bpByCode = new Map((data.items || []).map(i => [i.code, i]));
+  }catch(e){
+    state.bp = null; state.bpByCode = new Map();
+    // 同源探测失败只说明"这里没部署后端"，不是错误；显式填了地址才算连接失败。
+    state.bpErr = base === "" ? null
+      : (e.message.includes("Failed to fetch")
+          ? "无法连接买点分级服务（检查地址是否正确、服务是否已启动）"
+          : e.message);
+  }finally{
+    state.bpLoading = false;
+  }
+}
+
+async function fetchDetail(code){
+  state.detail = { code, data: null, loading: true, err: null };
+  render();
+  try{
+    const r = await fetch(`${apiBase() || ""}/api/buypoint/${code}`, { cache: "no-store" });
+    const j = await r.json().catch(() => null);
+    if (!r.ok){
+      const err = new Error(j?.error || `HTTP ${r.status}`);
+      err.status = j?.status || null;      // not_triggered / unsupported / pending / error
+      throw err;
+    }
+    state.detail = { code, data: j, loading: false, err: null };
+  }catch(e){
+    state.detail = { code, data: null, loading: false,
+      err: e.message.includes("Failed to fetch") ? "无法连接买点分级服务" : e.message,
+      errStatus: e.status || null };
+  }
+  render();
+}
+
+/* =========================================================================
    6. 格式化
    ========================================================================= */
 const fmt = {
@@ -746,10 +960,18 @@ const COLUMNS = [
   { id:"scale",  label:"规模(亿)", sortable:true },
   { id:"high",   label:"最高价",   sortable:true },
   { id:"low",    label:"最低价",   sortable:true },
-  { id:"ytd",    label:"年涨跌幅", sortable:true, hint:"今年以来的净值收益率。指向表格中的具体数值，可查看该只标的近 1 年收益率" }
+  { id:"ytd",    label:"年涨跌幅", sortable:true, hint:"今年以来的净值收益率。指向表格中的具体数值，可查看该只标的近 1 年收益率" },
+  { id:"grade",  label:"分级",     sortable:true,
+    hint:"双维度分位买点分级（A/B/C/D）。仅对当前溢价 > 2% 的标的计算 —— 溢价长期低于阈值时，这套框架没有决策增量。数据由后端每交易日滚动计算，盘中为估算值。" }
 ];
 
+const GRADE_ORDER = { A: 0, B: 1, C: 2, D: 3 };
+
 function sortValue(row, key){
+  if (key === "grade"){
+    const bp = state.bpByCode.get(row.meta.code);
+    return (bp && bp.status === "ok") ? GRADE_ORDER[bp.grade] : null;
+  }
   const d = row.d || {};
   return d[key] == null ? null : d[key];
 }
@@ -771,7 +993,9 @@ function sortedRows(){
 function onHeaderClick(col){
   if (!col.sortable) return;
   const s = state.sort;
-  if (s.key !== col.id) { s.key = col.id; s.dir = -1; }        // 首次点击：降序（大→小，更符合看行情的直觉）
+  // 行情类列首次点击给降序（大→小符合看盘直觉）；分级列反过来 ——
+  // 看买点分级时想先看到最好的档位，A 在前才有用。
+  if (s.key !== col.id) { s.key = col.id; s.dir = col.id === "grade" ? 1 : -1; }
   else if (s.dir === -1) { s.dir = 1; }                         // 再点：升序
   else { s.key = null; s.dir = 1; }                             // 三点：恢复默认（代码升序）
   localStorage.setItem(LS_SORT, JSON.stringify(s));
@@ -820,6 +1044,8 @@ function cellHTML(row, col){
     case "low":
       if (pending) return `<td class="num">${sk("w-sm")}</td>`;
       return `<td class="num dim">${d.low == null ? '<span class="na">—</span>' : fmt.price(d.low)}</td>`;
+    case "grade":
+      return gradeCell(m);
     case "ytd": {
       if (pending) return `<td class="num">${sk()}</td>`;
       const t = `今年以来 ${fmt.pct(d.ytd) || "—"} ｜ 近1年 ${fmt.pct(d.y1) || "—"}`;
@@ -871,6 +1097,12 @@ function renderMeta(){
     parts.push(`<span>本次刷新 <b>${fmt.clock(state.lastRefresh)}</b></span>`);
     if (bad){ parts.push(`<span class="sep"></span><span style="color:var(--danger)">失败 <b style="color:var(--danger)">${bad}</b> 只</span>`); }
     else if (ok){ parts.push(`<span class="sep"></span><span style="color:var(--ok)">全部成功</span>`); }
+    if (state.bp){
+      const c2 = state.bp.counts || {};
+      parts.push(`<span class="sep"></span><span data-tip="分级由后端 Worker 每交易日滚动计算${state.bp.baselines ? `｜本轮基线：新建 ${state.bp.baselines.built.length}、复用 ${state.bp.baselines.reused.length}` : ""}">分级 <b>${c2.graded||0}</b>/<b>${c2.triggered||0}</b> 触发（阈值 ${state.bp.threshold}%）</span>`);
+    } else if (state.bpErr){
+      parts.push(`<span class="sep"></span><span style="color:var(--danger)" data-tip="${esc(state.bpErr)}">分级服务不可用</span>`);
+    }
     if (state.sort.key){
       const c = COLUMNS.find(c => c.id === state.sort.key);
       parts.push(`<span class="sep"></span><span>按 <b>${esc(c.label)}</b> ${state.sort.dir===1?"升序":"降序"}（再点两次列头恢复默认）</span>`);
@@ -905,6 +1137,19 @@ function render(){
   const c = document.getElementById("content");
   document.getElementById("refreshBtn").disabled = state.loading;
   renderKeyPill();
+
+  // 详情视图：同页切换，不新建 HTML 文件、不做服务端路由
+  if (state.detail.code){
+    document.getElementById("metabar").innerHTML = "";
+    document.getElementById("progressTrack").hidden = true;
+    document.getElementById("footnote").hidden = true;   // 页脚讲的是列表各列口径，详情页用不上
+    c.innerHTML = renderDetail();
+    const b = document.getElementById("backBtn");
+    if (b) b.addEventListener("click", goList);
+    return;
+  }
+
+  document.getElementById("footnote").hidden = false;
   renderMeta();
 
   if (!state.apiKey){
@@ -918,6 +1163,9 @@ function render(){
   }
 
   c.innerHTML = renderTable();
+  c.querySelectorAll("[data-detail]").forEach(btn => {
+    btn.addEventListener("click", ev => { ev.stopPropagation(); goDetail(btn.dataset.detail); });
+  });
   c.querySelectorAll("th.sortable").forEach(th => {
     const col = COLUMNS.find(x => x.id === th.dataset.col);
     th.addEventListener("click", () => onHeaderClick(col));
@@ -925,6 +1173,51 @@ function render(){
       if (ev.key === "Enter" || ev.key === " "){ ev.preventDefault(); onHeaderClick(col); }
     });
   });
+}
+
+/* =========================================================================
+   7a. 分级单元格
+   =========================================================================
+   四种"没有等级"的原因必须分开表达，不能都渲染成一个"—"：
+     not_triggered  溢价未超阈值 —— 不是算失败，是压根没触发计算条件
+     unsupported    该品种没有历史场内行情（LOF），建不出基线
+     pending        基线还在滚动补齐，下次调度就有
+     未配置服务      用户还没填 Worker 地址
+   ========================================================================= */
+function gradeCell(meta){
+  if (apiBase() === null || (!state.bp && !state.bpErr && !state.bpLoading))
+    return `<td class="num"><span class="gna" data-tip="当前没有可用的买点分级服务。若后端与本页同源部署则自动生效；否则打开「⚙️ API设置」填入服务地址。">—</span></td>`;
+  if (state.bpErr)
+    return `<td class="num"><span class="gna" data-tip="${esc(state.bpErr)}">!</span></td>`;
+  if (!state.bp)
+    return `<td class="num"><span class="gna">${state.bpLoading ? '<span class="skel w-sm"></span>' : "—"}</span></td>`;
+
+  const bp = state.bpByCode.get(meta.code);
+  if (!bp) return `<td class="num"><span class="gna" data-tip="分级服务未返回该标的">—</span></td>`;
+
+  if (bp.status === "not_triggered")
+    return `<td class="num"><span class="gna" data-tip="当前溢价 ${fmt.pct(bp.prem)}，未超过 ${bp.threshold}% 阈值，未触发分级计算（不是计算失败）。溢价长期低于阈值时，双维度框架没有决策增量。">—</span></td>`;
+  if (bp.status === "unsupported")
+    return `<td class="num"><span class="gna" data-tip="${esc(bp.message || "该品种不支持分级")}">n/a</span></td>`;
+  if (bp.status === "pending")
+    return `<td class="num"><span class="gna" data-tip="${esc(bp.message || "基线尚未建立")}">···</span></td>`;
+  if (bp.status === "error")
+    return `<td class="num"><span class="gna" data-tip="${esc(bp.message || "计算失败")}">!</span></td>`;
+
+  const tip = [
+    `${bp.grade} 档 · ${GRADE_TEXT[bp.grade]}`,
+    `指数分位 ${bp.idxPct.toFixed(1)} ｜ 溢价分位 ${bp.premPct.toFixed(1)}（0=窗口最低）`,
+    `判定线：分位 ≤ ${state.bp.lowCut} 视为低位，窗口 ${bp.window} 个交易日`,
+    `盘中估算值：分位边界用收盘数据算，当前这一点用实时价`,
+    bp.baselineStale ? `⚠️ 基线为 ${bp.baselineDate}，尚未更新到今日` : "",
+    bp.proxy ? `⚠️ 指数用 ${bp.indexSymbol} 代理 ${bp.proxy.of}` : "",
+    bp.indexVerified ? "" : "⚠️ 指数映射待核实"
+  ].filter(Boolean).join("\n");
+
+  return `<td class="num"><span class="gcell">` +
+    `<button class="detail-link" data-detail="${meta.code}">详情</button>` +
+    `<span class="badge est ${bp.grade}" data-tip="${esc(tip)}">${bp.grade}</span>` +
+    `</span></td>`;
 }
 
 /* =========================================================================
@@ -1003,6 +1296,225 @@ window.addEventListener("scroll", hideTip, true);
 window.addEventListener("resize", hideTip);
 
 /* =========================================================================
+   7c. 详情视图（同页切换，用 URL hash 承载状态）
+   =========================================================================
+   图表全部手写内联 SVG，不引入外部图表库 —— 与本页"单文件、零依赖"的定位一致。
+   两个维度都画成 0–100 分位、共用一根 Y 轴，而不是"指数点位 + 溢价率"的双轴图：
+   双轴图是公认反模式，两条量纲不同的线放在两根轴上，交叉点完全由刻度缩放决定，
+   会让人读出根本不存在的"金叉/死叉"。统一成分位后，两条线才真的可比。
+   ========================================================================= */
+const CHART_W = 760, CHART_H = 240, PAD = { t: 14, r: 14, b: 26, l: 34 };
+
+function svgTrend(series, lowCut){
+  const n = series.length;
+  const iw = CHART_W - PAD.l - PAD.r, ih = CHART_H - PAD.t - PAD.b;
+  const x = i => PAD.l + (n <= 1 ? iw / 2 : (i / (n - 1)) * iw);
+  const y = v => PAD.t + (1 - v / 100) * ih;
+
+  const path = key => series.map((r, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(r[key]).toFixed(1)}`).join("");
+  const gridY = [0, 25, 50, 75, 100].map(v =>
+    `<line x1="${PAD.l}" y1="${y(v)}" x2="${CHART_W - PAD.r}" y2="${y(v)}"
+       stroke="var(--border-muted)" stroke-width="1"/>
+     <text x="${PAD.l - 6}" y="${y(v) + 3.5}" text-anchor="end" font-size="10">${v}</text>`).join("");
+
+  // 下四分位带：低于这条线才算"低位"，是两个维度共用的判定线
+  const band = `<rect x="${PAD.l}" y="${y(lowCut)}" width="${iw}" height="${PAD.t + ih - y(lowCut)}"
+      fill="var(--accent)" opacity="0.11"/>
+    <line x1="${PAD.l}" y1="${y(lowCut)}" x2="${CHART_W - PAD.r}" y2="${y(lowCut)}"
+      stroke="var(--accent)" stroke-width="1.2" stroke-dasharray="5 3" opacity="0.8"/>
+    <text x="${CHART_W - PAD.r - 2}" y="${y(lowCut) - 5}" text-anchor="end" font-size="10"
+      fill="var(--accent)">低位线 ${lowCut}</text>`;
+
+  const ticks = [];
+  const step = Math.max(1, Math.ceil(n / 6));
+  for (let i = 0; i < n; i += step)
+    ticks.push(`<text x="${x(i)}" y="${CHART_H - 8}" text-anchor="middle" font-size="10">${shortDate(series[i].dateMs)}</text>`);
+  if (n) ticks.push(`<text x="${x(n-1)}" y="${CHART_H - 8}" text-anchor="end" font-size="10">${shortDate(series[n-1].dateMs)}</text>`);
+
+  return `<svg class="chart" viewBox="0 0 ${CHART_W} ${CHART_H}" preserveAspectRatio="xMidYMid meet" role="img"
+      aria-label="60个交易日的指数分位与溢价分位趋势">
+    ${gridY}${band}
+    <path d="${path("idxPct")}" fill="none" stroke="var(--gB)" stroke-width="1.8" stroke-linejoin="round"/>
+    <path d="${path("premPct")}" fill="none" stroke="var(--gC)" stroke-width="1.8" stroke-linejoin="round"/>
+    ${ticks.join("")}
+  </svg>`;
+}
+
+function svgGradeStrip(series){
+  return `<div class="gridcells">` + series.map(r =>
+    `<i style="background:var(--g${r.grade}-bg);border:1px solid var(--g${r.grade}-bd)"
+        data-tip="${shortDate(r.dateMs)} · ${r.grade} 档｜指数分位 ${r.idxPct.toFixed(0)}｜溢价分位 ${r.premPct.toFixed(0)}｜溢价 ${fmt.pct(r.prem)}"></i>`
+  ).join("") + `</div>`;
+}
+
+function shortDate(ms){
+  const d = new Date(ms);
+  return `${d.getMonth() + 1}/${String(d.getDate()).padStart(2, "0")}`;
+}
+function fullDate(ms){
+  const d = new Date(ms), p = v => String(v).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+function renderDetail(){
+  const { code, data, loading, err, errStatus } = state.detail;
+  const meta = ETFS.find(e => e.code === code);
+  const back = `<button class="btn" id="backBtn">← 返回列表</button>`;
+
+  if (loading) return `<div class="detail-head"><div class="t"><h2>${esc(code)}</h2>
+    <div class="meta"><span class="spinner"></span> 正在加载分级明细…</div></div>${back}</div>`;
+
+  if (err){
+    // 「没有分级」不等于「出错了」：未触发阈值、品种不支持、基线待补都是正常状态，
+    // 用告警色渲染会让人以为系统坏了。
+    const benign = ["not_triggered", "unsupported", "pending"].includes(errStatus);
+    return `<div class="detail-head"><div class="t"><h2>${esc(code)} ${esc(meta?.name || "")}</h2></div>${back}</div>
+      <div class="alert${benign ? " warn" : ""}"><span class="ic">${benign ? "ℹ️" : "⛔"}</span><div class="body">
+        <div class="title">${benign ? "该标的当前没有买点分级" : "无法加载分级明细"}</div>
+        <div class="detail">${esc(err)}</div>
+        ${benign ? '<div class="detail" style="margin-top:6px">分级只对当前溢价 > 2% 且有完整历史场内行情的标的计算。</div>' : ""}
+      </div></div>`;
+  }
+
+  const d = data;
+  const live = d.live;
+  const s = d.series;
+
+  const notices = [];
+  if (d.baselineStale) notices.push(`<div class="notice"><span class="ic">⚠️</span><div>
+    分位边界来自 <b>${esc(d.baselineDate)}</b> 的基线，尚未更新到今日 —— 后端按 subrequest 预算滚动补齐，下一次调度会刷新。</div></div>`);
+  if (d.proxy) notices.push(`<div class="notice"><span class="ic">⚠️</span><div>
+    指数维度用 <b>${esc(d.indexSymbol)}</b> 代理 <b>${esc(d.proxy.ofName || d.proxy.of)}</b>：${esc(d.proxy.why)}。
+    分位排名对量纲不敏感，但跟踪误差仍会带来偏差。</div></div>`);
+  if (d.indexVerified === false) notices.push(`<div class="notice"><span class="ic">⚠️</span><div>
+    该标的的<b>底层指数映射尚未核实</b>（当前用 <code>${esc(d.indexSymbol)}</code>）。指数选错会直接让指数维度失真，
+    结论仅供参考，请先确认映射是否正确。</div></div>`);
+  (d.warnings || []).forEach(w => notices.push(`<div class="notice"><span class="ic">⚠️</span><div>${esc(w)}</div></div>`));
+
+  const dist = d.dist, total = dist.A + dist.B + dist.C + dist.D;
+  const distBar = ["A","B","C","D"].filter(g => dist[g] > 0).map(g =>
+    `<div style="flex:${dist[g]};background:var(--g${g}-bg);color:var(--g${g})"
+       data-tip="${g} 档 ${dist[g]} 天，占 ${(dist[g]/total*100).toFixed(0)}%">${dist[g]}</div>`).join("");
+
+  const rows = s.slice().reverse().map(r => `<tr>
+      <td>${fullDate(r.dateMs)}</td>
+      <td>${r.close.toFixed(3)}</td>
+      <td>${r.nav.toFixed(4)}</td>
+      <td class="${dirCls(r.prem)}">${fmt.pct(r.prem)}</td>
+      <td>${r.idx.toFixed(2)}</td>
+      <td>${r.idxPct.toFixed(1)}</td>
+      <td>${r.premPct.toFixed(1)}</td>
+      <td><span class="badge ${r.grade}" style="cursor:default">${r.grade}</span></td>
+    </tr>`).join("");
+
+  return `
+  <div class="detail-head">
+    <div class="t">
+      <h2>${esc(code)} ${esc(d.name || meta?.name || "")}</h2>
+      <div class="meta">底层指数 <code>${esc(d.indexSymbol)}</code> ${esc(d.indexName)} ·
+        窗口 ${d.window} 个交易日 · 基线日期 ${esc(d.baselineDate)} ·
+        低位判定线 分位 ≤ ${d.lowCut}</div>
+    </div>
+    ${back}
+  </div>
+
+  ${notices.join("")}
+
+  <div class="notice info"><span class="ic">ℹ️</span><div>
+    <b>盘中估算，非收盘确认值。</b>分位边界（四分位、A/B/C/D 阈值）只用近 ${d.window} 个交易日的
+    <b>收盘价 + 收盘净值</b>计算，一天算一次；只有"当前这一个点"用实时价格去对照。
+    用日内瞬时溢价代替收盘溢价会造成假信号，所以两者必须分开看。
+    所有阈值都来自当前窗口的真实分布，<b>窗口滚动后会漂移</b>，不能当作永久基准。
+  </div></div>
+
+  <div class="panels">
+    <div class="panel hero">
+      <span class="badge ${live.grade}">${live.grade}</span>
+      <div class="hb">
+        <div class="k">当前等级（估算）</div>
+        <div class="lbl">${esc(GRADE_TEXT[live.grade])}</div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="k">指数分位</div>
+      <div class="v ${live.idxPct <= d.lowCut ? "up" : ""}">${live.idxPct.toFixed(1)}</div>
+      <div class="s">${esc(d.indexSymbol)} ${live.idx.toFixed(2)}（美股 ${fullDate(live.idxDateMs)} 收盘）</div>
+    </div>
+    <div class="panel">
+      <div class="k">溢价分位</div>
+      <div class="v ${live.premPct <= d.lowCut ? "up" : ""}">${live.premPct.toFixed(1)}</div>
+      <div class="s">当前估算溢价 ${fmt.pct(live.prem)}</div>
+    </div>
+    <div class="panel">
+      <div class="k">窗口溢价四分位</div>
+      <div class="v" style="font-size:15px">${fmt.pct(d.cuts.premQ1)} / ${fmt.pct(d.cuts.premMed)} / ${fmt.pct(d.cuts.premQ3)}</div>
+      <div class="s">Q1 / 中位 / Q3 —— 门槛来自真实分布，不是拍脑袋定的数字</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>双维度分位趋势 <span class="sub">近 ${d.window} 个交易日，两条线共用 0–100 分位轴</span></h3>
+    <div class="body" style="padding-bottom:4px">${svgTrend(s, d.lowCut)}</div>
+    <div class="legend">
+      <span><i style="background:var(--gB)"></i>指数分位</span>
+      <span><i style="background:var(--gC)"></i>溢价分位</span>
+      <span><i style="background:var(--accent);opacity:.28;height:10px;border-radius:2px;vertical-align:-1px"></i>低位区（≤ ${d.lowCut}）</span>
+      <span style="color:var(--fg-subtle)">两者常呈负相关：指数越跌，场内资金越容易把溢价顶高</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>分级占比 <span class="sub">近 ${d.window} 个交易日逐日等级</span></h3>
+    <div class="body">
+      <div class="distbar">${distBar}</div>
+      <div class="distlegend">
+        ${["A","B","C","D"].map(g => `<span><span class="badge ${g}" style="width:16px;height:16px;font-size:10px;cursor:default"></span>
+          ${g} <b>${dist[g]}</b> 天 · ${(dist[g]/total*100).toFixed(0)}%</span>`).join("")}
+      </div>
+      <div style="margin-top:14px">${svgGradeStrip(s)}</div>
+      <div style="font-size:11px;color:var(--fg-subtle);margin-top:8px">左→右为时间顺序，鼠标指向单格可看当日明细</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>逐日明细 <span class="sub">按日期倒序</span></h3>
+    <div class="scroll" style="overflow:auto;max-height:440px">
+      <table class="dtable">
+        <thead><tr>
+          <th>交易日</th><th>收盘价</th><th>单位净值</th><th>收盘溢价</th>
+          <th>指数点位</th><th>指数分位</th><th>溢价分位</th><th>等级</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+/* ---- hash 路由：#detail=513100 ---- */
+function parseHash(){
+  const m = (location.hash || "").match(/^#detail=(\d{6})$/);
+  return m ? { view: "detail", code: m[1] } : { view: "list" };
+}
+function goDetail(code){ location.hash = `detail=${code}`; }
+function goList(){
+  if (location.hash) history.pushState("", document.title, location.pathname + location.search);
+  onRoute();
+}
+function onRoute(){
+  const r = parseHash();
+  if (r.view === "detail"){
+    if (state.detail.code !== r.code || (!state.detail.data && !state.detail.loading && !state.detail.err)){
+      fetchDetail(r.code);
+      return;
+    }
+  } else {
+    state.detail = { code: null, data: null, loading: false, err: null };
+  }
+  render();
+}
+window.addEventListener("hashchange", onRoute);
+
+/* =========================================================================
    8. 告警区
    ========================================================================= */
 function clearAlerts(){ document.getElementById("alerts").innerHTML = ""; }
@@ -1042,6 +1554,9 @@ const keyInput   = document.getElementById("keyInput");
 const keyStatus  = document.getElementById("keyStatus");
 
 function openModal(){
+  document.getElementById("workerInput").value = state.workerUrl || "";
+  document.getElementById("workerStatus").innerHTML = "";
+  document.getElementById("workerStatus").className = "status-line";
   keyInput.value = state.apiKey || "";
   keyInput.type = "password";
   keyStatus.className = "status-line";
@@ -1078,15 +1593,55 @@ document.getElementById("clearKeyBtn").addEventListener("click", () => {
 document.getElementById("saveKeyBtn").addEventListener("click", validateAndSave);
 keyInput.addEventListener("keydown", e => { if (e.key === "Enter") validateAndSave(); });
 
+/** Worker 地址与 API Key 相互独立，各自校验、各自保存 */
+async function saveWorkerUrl(){
+  const raw = document.getElementById("workerInput").value.trim().replace(/\/+$/, "");
+  const st = document.getElementById("workerStatus");
+  if (raw === (state.workerUrl || "")) return true;
+
+  if (!raw){
+    localStorage.removeItem(LS_WORKER);
+    state.workerUrl = ""; state.bp = null; state.bpByCode = new Map(); state.bpErr = null;
+    st.className = "status-line"; st.innerHTML = "已移除分级服务地址";
+    return true;
+  }
+  if (!/^https?:\/\//.test(raw)){
+    st.className = "status-line bad"; st.innerHTML = "✕ 地址需以 http:// 或 https:// 开头";
+    return false;
+  }
+
+  st.className = "status-line busy";
+  st.innerHTML = `<span class="spinner"></span>正在连接分级服务…`;
+  try{
+    const r = await fetch(raw + "/health", { cache: "no-store" });
+    const j = await r.json();
+    if (!j.ok) throw new Error("服务响应异常");
+    localStorage.setItem(LS_WORKER, raw);
+    state.workerUrl = raw;
+    st.className = "status-line ok";
+    st.innerHTML = j.hasData
+      ? `✓ 已连接，最近一次计算 ${esc(j.date || "")}（已分级 ${j.counts?.graded ?? "?"} 只）`
+      : `✓ 已连接，但服务尚无数据 —— 需先调用 /api/refresh 预热，或等待下一个交易日的定时任务`;
+    return true;
+  }catch(e){
+    st.className = "status-line bad";
+    st.innerHTML = `✕ 无法连接：${esc(e.message)}<br><span style="color:var(--fg-muted)">确认 Worker 已部署且地址正确</span>`;
+    return false;
+  }
+}
+
 async function validateAndSave(){
   const key = keyInput.value.trim();
   const btn = document.getElementById("saveKeyBtn");
   if (!key){
+    await saveWorkerUrl();
+    render();
     keyStatus.className = "status-line bad";
-    keyStatus.innerHTML = "✕ 请输入 API 密钥";
+    keyStatus.innerHTML = "✕ 请输入 API 密钥（分级服务地址已单独保存）";
     return;
   }
   btn.disabled = true;
+  await saveWorkerUrl();
   keyStatus.className = "status-line busy";
   keyStatus.innerHTML = `<span class="spinner"></span><span>正在验证…</span>`;
   try{
@@ -1115,8 +1670,9 @@ async function validateAndSave(){
 document.getElementById("refreshBtn").addEventListener("click", refreshAll);
 window.openModal = openModal;
 
-render();
+onRoute();
 if (state.apiKey) refreshAll();
+else if (apiBase() !== null) fetchBuypoint().then(render);
 </script>
 </body>
 </html>

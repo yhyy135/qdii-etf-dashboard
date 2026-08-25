@@ -1,0 +1,70 @@
+# 把这段并入你现有的 Caddyfile，域名换成自己的。
+#
+# 容器只绑在 127.0.0.1:8787，公网唯一入口是 Caddy。
+
+etf.example.com {
+	encode zstd gzip
+
+	reverse_proxy 127.0.0.1:8787 {
+		# 让应用日志能看到真实来源 IP（经 Cloudflare 时是 CF-Connecting-IP）
+		header_up X-Real-IP {http.request.header.CF-Connecting-IP}
+	}
+
+	log {
+		output file /var/log/caddy/etf.log {
+			roll_size 10MiB
+			roll_keep 5
+		}
+	}
+}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 关于证书：套 Cloudflare CDN 时的三种做法
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# 先说清楚一件事：Caddy 本来就会自动申请并续期 Let's Encrypt 证书，
+# "不用经常维护 SSL 证书"这个目标，只用 Caddy 就已经达成了，套 CDN 不是必要条件。
+#
+# 而且套上 Cloudflare 橙云代理后，源站**仍然需要**一张证书 ——
+# 除非把 CF 的 SSL/TLS 模式设成 Flexible（CF 到源站走明文 HTTP），那等于把
+# "浏览器→CF"这一段加密了、"CF→源站"这一段裸奔，不要这么做。
+#
+# 【做法 A】什么都不改（推荐先试这个）
+#   保持上面的配置，CF SSL/TLS 模式设为 "Full (strict)"。
+#   Caddy 通过 HTTP-01 挑战申请证书，Cloudflare 会把 /.well-known/acme-challenge/
+#   透传回源站，通常能正常签发和续期。
+#   注意：CF 的 "Always Use HTTPS" 开着时可能把挑战请求 301 走，若签发失败先关掉它试试。
+#
+# 【做法 B】用 Cloudflare Origin 证书（有效期 15 年，真正一劳永逸）
+#   在 CF 控制台 SSL/TLS → Origin Server → Create Certificate 生成证书和私钥，
+#   存到服务器上，然后把站点块改成：
+#
+#   etf.example.com {
+#   	tls /etc/caddy/cf-origin.pem /etc/caddy/cf-origin.key
+#   	encode zstd gzip
+#   	reverse_proxy 127.0.0.1:8787
+#   }
+#
+#   CF SSL/TLS 模式设为 "Full (strict)"。这张证书只有 Cloudflare 认，
+#   所以域名必须一直挂在 CF 橙云后面，不能绕过。
+#
+# 【做法 C】DNS-01 挑战（需要带 Cloudflare 插件的 Caddy 构建）
+#   橙云代理下最稳，但要自己编译 Caddy 或用 xcaddy 装 caddy-dns/cloudflare 插件，
+#   还要配一个 CF API Token。除非 A 和 B 都不行，否则没必要。
+#
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# Cloudflare 缓存
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# 服务端已经把缓存策略写在响应头里，CF 默认"尊重源站头"，一般不用额外配规则：
+#
+#   /api/buypoint         Cache-Control: public, max-age=60, s-maxage=60   ← 允许 CDN 缓存 60 秒
+#   /api/buypoint/{代码}   同上
+#   /health               Cache-Control: no-store                          ← 绝不缓存
+#   /api/refresh          Cache-Control: no-store，且只接受 POST            ← POST 天然不被缓存
+#   看板 HTML              must-revalidate                                  ← 改完重启即生效
+#
+# 如果你在 CF 上开了 "Cache Everything" 之类的页面规则，务必把 /api/refresh 和 /health
+# 排除掉，否则健康检查和手动触发的响应会被缓存后发给别人。

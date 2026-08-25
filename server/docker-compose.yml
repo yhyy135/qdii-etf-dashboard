@@ -1,0 +1,28 @@
+services:
+  etf-buypoint:
+    build:
+      # 上下文取仓库根目录，好让镜像直接拷根目录那份 etf-dashboard.html，
+      # 避免在 server/public/ 下维护一份需要手动同步的副本
+      context: ..
+      dockerfile: server/Dockerfile
+    image: etf-buypoint:latest
+    container_name: etf-buypoint
+    restart: unless-stopped
+
+    # 只绑到回环地址：外部一律经 Caddy 进来，容器端口不直接暴露到公网。
+    ports:
+      - "127.0.0.1:8787:8787"
+
+    volumes:
+      - ./data:/data
+
+    environment:
+      FUYAO_API_KEY: ${FUYAO_API_KEY:?需要在 .env 里设置}
+      ADMIN_TOKEN: ${ADMIN_TOKEN:?需要在 .env 里设置}
+      # 北京时间的调度时刻，容器时区无关（代码内部按东八区偏移计算）
+      SCHEDULE_TIMES: "09:30,10:30,11:30,13:30,14:30,15:00"
+      RUN_ON_BOOT: "1"
+
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }

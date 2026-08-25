@@ -1,0 +1,14 @@
+{
+  "name": "etf-buypoint",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "美股 QDII ETF 双维度分位买点分级服务",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "DB_FILE=./data/buypoint.db PORT=8787 node src/server.js",
+    "test:verify": "node test/verify.mjs",
+    "test:pipeline": "node test/pipeline.mjs"
+  }
+}
